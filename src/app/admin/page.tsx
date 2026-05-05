@@ -131,6 +131,16 @@ type CartItem = {
   quantity: number;
 };
 
+type ProductContent = {
+  key: string;
+  name: string;
+  redemptionInstructions: string;
+  tutorialSteps: string[];
+  tutorialVideoUrl: string | null;
+  hasCustomInstructions: boolean;
+  hasCustomSteps: boolean;
+};
+
 const PRODUCT_OPTIONS = [
   { key: "zus", name: "ZUS Coffee" },
   { key: "chagee", name: "Chagee" },
@@ -159,6 +169,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [editPriceLabel, setEditPriceLabel] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
+
+  // Product Content editing
+  const [productContents, setProductContents] = useState<ProductContent[]>([]);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [editingContent, setEditingContent] = useState<string | null>(null);
+  const [editInstructions, setEditInstructions] = useState("");
+  const [editSteps, setEditSteps] = useState<string[]>([]);
+  const [editVideoUrl, setEditVideoUrl] = useState("");
+  const [savingContent, setSavingContent] = useState(false);
 
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
   const [editOrderId, setEditOrderId] = useState("");
@@ -223,6 +242,59 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       toast.error("Update failed.");
     } finally {
       setSavingPrice(false);
+    }
+  }
+
+  async function fetchProductContents() {
+    setContentLoading(true);
+    try {
+      const res = await fetch("/api/admin/product-content");
+      const data = await res.json();
+      if (res.ok) setProductContents(data.products);
+      else toast.error(data.message ?? "Failed to fetch product content.");
+    } catch {
+      toast.error("Failed to fetch product content.");
+    } finally {
+      setContentLoading(false);
+    }
+  }
+
+  function startContentEdit(p: ProductContent) {
+    setEditingContent(p.key);
+    setEditInstructions(p.redemptionInstructions);
+    setEditSteps(p.tutorialSteps.length ? [...p.tutorialSteps] : [""]);
+    setEditVideoUrl(p.tutorialVideoUrl ?? "");
+  }
+
+  function cancelContentEdit() {
+    setEditingContent(null);
+  }
+
+  async function saveContentEdit(productKey: string) {
+    setSavingContent(true);
+    try {
+      const res = await fetch("/api/admin/product-content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productKey,
+          redemptionInstructions: editInstructions,
+          tutorialSteps: editSteps.filter((s) => s.trim()),
+          tutorialVideoUrl: editVideoUrl
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message);
+        setEditingContent(null);
+        fetchProductContents();
+      } else {
+        toast.error(data.message ?? "Save failed.");
+      }
+    } catch {
+      toast.error("Save failed.");
+    } finally {
+      setSavingContent(false);
     }
   }
 
@@ -373,6 +445,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     fetchBalance();
     fetchOrders();
     fetchPrices();
+    fetchProductContents();
   }, []);
 
   return (
@@ -524,6 +597,138 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Product Content */}
+      <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Product Content</h2>
+          <button onClick={fetchProductContents} disabled={contentLoading} className="text-xs text-cyan-600 hover:underline dark:text-cyan-400">
+            Refresh
+          </button>
+        </div>
+        {contentLoading ? (
+          <p className="px-4 pb-4 text-sm text-slate-500">Loading...</p>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {productContents.map((p) => (
+              <div key={p.key} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-slate-900 dark:text-white">{p.name}</span>
+                    {p.hasCustomInstructions && (
+                      <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-xs text-violet-600 dark:text-violet-400">custom instructions</span>
+                    )}
+                    {p.hasCustomSteps && (
+                      <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-600 dark:text-cyan-400">custom steps</span>
+                    )}
+                    {p.tutorialVideoUrl && (
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">video set</span>
+                    )}
+                  </div>
+                  {editingContent !== p.key && (
+                    <button onClick={() => startContentEdit(p)} className="text-xs text-cyan-600 hover:underline dark:text-cyan-400">
+                      Edit
+                    </button>
+                  )}
+                </div>
+
+                {editingContent === p.key && (
+                  <div className="mt-4 space-y-4">
+                    {/* Redemption Instructions */}
+                    <div>
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Redemption Instructions (ⓘ button text)
+                      </label>
+                      <textarea
+                        value={editInstructions}
+                        onChange={(e) => setEditInstructions(e.target.value)}
+                        rows={10}
+                        className="mt-1 w-full border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
+
+                    {/* Tutorial Steps */}
+                    <div>
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Tutorial Step-by-Step Guide
+                      </label>
+                      <div className="mt-2 space-y-2">
+                        {editSteps.map((step, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className="mt-2 flex h-5 w-5 shrink-0 items-center justify-center bg-violet-500 text-xs font-bold text-white">
+                              {i + 1}
+                            </span>
+                            <input
+                              value={step}
+                              onChange={(e) => {
+                                const updated = [...editSteps];
+                                updated[i] = e.target.value;
+                                setEditSteps(updated);
+                              }}
+                              className="flex-1 border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                              placeholder={`Step ${i + 1}`}
+                            />
+                            <button
+                              onClick={() => setEditSteps(editSteps.filter((_, idx) => idx !== i))}
+                              className="mt-1.5 p-1 text-red-400 hover:text-red-600"
+                              title="Remove step"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => setEditSteps([...editSteps, ""])}
+                          className="mt-1 text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+                        >
+                          + Add Step
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* YouTube Video URL */}
+                    <div>
+                      <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        YouTube Embed URL
+                      </label>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Use embed format: https://www.youtube.com/embed/VIDEO_ID
+                      </p>
+                      <input
+                        value={editVideoUrl}
+                        onChange={(e) => setEditVideoUrl(e.target.value)}
+                        placeholder="https://www.youtube.com/embed/..."
+                        className="mt-1 w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                      />
+                      {editVideoUrl && (
+                        <div className="mt-2 aspect-video w-full max-w-sm overflow-hidden border border-slate-200 bg-black dark:border-slate-700">
+                          <iframe src={editVideoUrl} className="h-full w-full" allowFullScreen title="preview" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => saveContentEdit(p.key)}
+                        disabled={savingContent}
+                        className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60 dark:text-slate-950"
+                      >
+                        {savingContent ? "Saving..." : "Save Changes"}
+                      </button>
+                      <button
+                        onClick={cancelContentEdit}
+                        className="border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Add Order */}

@@ -86,10 +86,13 @@ model Payment {
 }
 
 model ProductSetting {
-  id         Int      @id @default(autoincrement())
-  productKey String   @unique
-  priceLabel String
-  updatedAt  DateTime @updatedAt
+  id                     Int      @id @default(autoincrement())
+  productKey             String   @unique
+  priceLabel             String
+  redemptionInstructions String?  // Overrides hardcoded instructions
+  tutorialSteps          String?  // JSON array of step strings
+  tutorialVideoUrl       String?  // YouTube embed URL
+  updatedAt              DateTime @updatedAt
 }
 
 model Claim {

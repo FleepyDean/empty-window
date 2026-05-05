@@ -1,95 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PRODUCT_CATALOG, ProductConfig } from "@/lib/products";
 import { ThemeToggle } from "@/components/theme";
 
 type TutorialEntry = {
-  productKey: string;
-  videoUrl: string | null;
-  steps: string[];
+  key: string;
+  name: string;
+  tutorialSteps: string[];
+  tutorialVideoUrl: string | null;
+  redemptionInstructions: string;
 };
 
-const TUTORIALS: TutorialEntry[] = [
-  {
-    productKey: "zus",
-    videoUrl: null,
-    steps: [
-      "Open the ZUS Coffee app and make sure you are logged out.",
-      "Tap 'Register' and insert the phone number provided to you.",
-      "Select 'Send SMS' — NOT WhatsApp — to receive the OTP.",
-      "Enter a random name, email, and set Date of Birth to tomorrow's date.",
-      "Skip the referral section — do NOT enter any referral code.",
-      "After logging in, go to Account → My Vouchers → Enter 'BUY1FREE1' and claim.",
-      "Enable Biometric Login in app settings so you can log in again if needed.",
-    ],
-  },
-  {
-    productKey: "chagee",
-    videoUrl: null,
-    steps: [
-      "Open the Chagee app and make sure you are logged out.",
-      "Tap 'Register' and insert the phone number provided to you.",
-      "Wait for the OTP SMS and enter it in the app.",
-      "Enter a random name and email. Set Date of Birth to tomorrow's date.",
-      "Skip the referral section — do NOT enter any referral code.",
-      "After logging in, go to Me → My Account to view your vouchers.",
-    ],
-  },
-  {
-    productKey: "tealive",
-    videoUrl: null,
-    steps: [
-      "Open the Tealive app and make sure you are logged out.",
-      "Tap 'Register' and insert the phone number provided to you.",
-      "Wait for the OTP SMS and enter it in the app.",
-      "Enter a random name and email. Skip any referral code section.",
-      "After logging in, go to Reward → My Vouchers to view your vouchers.",
-    ],
-  },
-  {
-    productKey: "kfc",
-    videoUrl: null,
-    steps: [
-      "Open the KFC app and make sure you are logged out.",
-      "Tap 'Register' and insert the phone number provided to you.",
-      "Wait for the OTP SMS and enter it in the app.",
-      "Enter a random name and email.",
-      "Enter referral code 'W4PQJETW' for an RM8 bonus.",
-      "After logging in, go to Order Now → Offers & Rewards to view your vouchers.",
-    ],
-  },
-  {
-    productKey: "cbtl",
-    videoUrl: null,
-    steps: [
-      "Open the MyCBTL app and make sure you are logged out.",
-      "Enter a random name and a valid email address.",
-      "Verify your email with the OTP sent to it.",
-      "Insert the phone number provided to you and wait for the OTP.",
-      "Skip the referral section — do NOT enter any referral code.",
-      "After logging in, go to Home → View My Vouchers to view your vouchers.",
-    ],
-  },
-  {
-    productKey: "gigi",
-    videoUrl: null,
-    steps: [
-      "Open the Gigi Coffee app and make sure you are logged out.",
-      "Tap 'Register' and insert the phone number provided to you.",
-      "Wait for the OTP SMS and enter it in the app.",
-      "Enter a random name and email. Skip any referral code section.",
-      "After logging in, go to Home → 1 Voucher to view your vouchers.",
-    ],
-  },
-];
+const DEFAULT_STEPS: Record<string, string[]> = {
+  zus: [
+    "Open the ZUS Coffee app and make sure you are logged out.",
+    "Tap 'Register' and insert the phone number provided to you.",
+    "Select 'Send SMS' — NOT WhatsApp — to receive the OTP.",
+    "Enter a random name, email, and set Date of Birth to tomorrow's date.",
+    "Skip the referral section — do NOT enter any referral code.",
+    "After logging in, go to Account → My Vouchers → Enter 'BUY1FREE1' and claim.",
+    "Enable Biometric Login in app settings so you can log in again if needed.",
+  ],
+  chagee: [
+    "Open the Chagee app and make sure you are logged out.",
+    "Tap 'Register' and insert the phone number provided to you.",
+    "Wait for the OTP SMS and enter it in the app.",
+    "Enter a random name and email. Set Date of Birth to tomorrow's date.",
+    "Skip the referral section — do NOT enter any referral code.",
+    "After logging in, go to Me → My Account to view your vouchers.",
+  ],
+  tealive: [
+    "Open the Tealive app and make sure you are logged out.",
+    "Tap 'Register' and insert the phone number provided to you.",
+    "Wait for the OTP SMS and enter it in the app.",
+    "Enter a random name and email. Skip any referral code section.",
+    "After logging in, go to Reward → My Vouchers to view your vouchers.",
+  ],
+  kfc: [
+    "Open the KFC app and make sure you are logged out.",
+    "Tap 'Register' and insert the phone number provided to you.",
+    "Wait for the OTP SMS and enter it in the app.",
+    "Enter a random name and email.",
+    "Enter referral code 'W4PQJETW' for an RM8 bonus.",
+    "After logging in, go to Order Now → Offers & Rewards to view your vouchers.",
+  ],
+  cbtl: [
+    "Open the MyCBTL app and make sure you are logged out.",
+    "Enter a random name and a valid email address.",
+    "Verify your email with the OTP sent to it.",
+    "Insert the phone number provided to you and wait for the OTP.",
+    "Skip the referral section — do NOT enter any referral code.",
+    "After logging in, go to Home → View My Vouchers to view your vouchers.",
+  ],
+  gigi: [
+    "Open the Gigi Coffee app and make sure you are logged out.",
+    "Tap 'Register' and insert the phone number provided to you.",
+    "Wait for the OTP SMS and enter it in the app.",
+    "Enter a random name and email. Skip any referral code section.",
+    "After logging in, go to Home → 1 Voucher to view your vouchers.",
+  ],
+};
 
 export default function TutorialPage() {
   const [selected, setSelected] = useState<string>(PRODUCT_CATALOG[0].key);
+  const [tutorials, setTutorials] = useState<TutorialEntry[]>([]);
+
+  useEffect(() => {
+    fetch("/api/products/content")
+      .then((r) => r.json())
+      .then((d) => { if (d.products) setTutorials(d.products); })
+      .catch(() => {});
+  }, []);
 
   const product = PRODUCT_CATALOG.find((p) => p.key === selected) as ProductConfig;
-  const tutorial = TUTORIALS.find((t) => t.productKey === selected);
+  const tutorial = tutorials.find((t) => t.key === selected);
+  const steps = tutorial?.tutorialSteps?.length ? tutorial.tutorialSteps : (DEFAULT_STEPS[selected] ?? []);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-10">
@@ -155,10 +142,10 @@ export default function TutorialPage() {
 
             {/* Video */}
             <div className="mt-5">
-              {tutorial?.videoUrl ? (
+              {tutorial?.tutorialVideoUrl ? (
                 <div className="aspect-video w-full overflow-hidden border border-slate-200 bg-black dark:border-slate-700">
                   <iframe
-                    src={tutorial.videoUrl}
+                    src={tutorial.tutorialVideoUrl}
                     title={`${product.name} tutorial`}
                     className="h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -180,7 +167,7 @@ export default function TutorialPage() {
             <div className="mt-6">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Step-by-Step Guide</h3>
               <ol className="mt-3 space-y-3">
-                {tutorial?.steps.map((step, i) => (
+                {steps.map((step: string, i: number) => (
                   <li key={i} className="flex gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center bg-violet-500 text-xs font-bold text-white">
                       {i + 1}

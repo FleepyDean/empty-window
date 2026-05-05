@@ -142,12 +142,19 @@ export function isProductKey(value: string): value is ProductKey {
 export async function getProductCatalogWithPrices(): Promise<ProductConfig[]> {
   const { prisma } = await import("@/lib/prisma");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const overrides = await (prisma as any).productSetting.findMany() as { productKey: string; priceLabel: string }[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const overrideMap = new Map(overrides.map((o: { productKey: string; priceLabel: string }) => [o.productKey, o.priceLabel]));
+  const overrides = await (prisma as any).productSetting.findMany() as {
+    productKey: string;
+    priceLabel: string;
+    redemptionInstructions?: string | null;
+  }[];
+  const overrideMap = new Map(overrides.map((o) => [o.productKey, o]));
 
-  return PRODUCT_CATALOG.map((p) => ({
-    ...p,
-    priceLabel: (overrideMap.get(p.key) ?? p.priceLabel) as string
-  }));
+  return PRODUCT_CATALOG.map((p) => {
+    const o = overrideMap.get(p.key);
+    return {
+      ...p,
+      priceLabel: o?.priceLabel ?? p.priceLabel,
+      redemptionInstructions: o?.redemptionInstructions ?? p.redemptionInstructions
+    };
+  });
 }
