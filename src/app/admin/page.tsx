@@ -418,7 +418,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <p className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats?.active ?? "—"}</p>
         </div>
         <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Total Remaining Qty</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Remaining Qty</p>
           <p className="mt-1 text-xl font-bold text-violet-600 dark:text-violet-400">{stats?.totalQuantity ?? "—"}</p>
         </div>
       </div>
