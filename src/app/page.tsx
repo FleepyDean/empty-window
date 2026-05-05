@@ -177,6 +177,12 @@ export default function StorePage() {
               </svg>
               Contact
             </a>
+            <Link
+              href="/tutorial"
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-violet-400 hover:bg-violet-50 hover:text-violet-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-violet-500 dark:hover:bg-violet-950 dark:hover:text-violet-400"
+            >
+              Tutorials
+            </Link>
             <ThemeToggle />
           </div>
         </div>
