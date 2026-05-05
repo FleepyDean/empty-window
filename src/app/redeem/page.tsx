@@ -479,7 +479,7 @@ function RedeemPageContent() {
                         {activeClaim.productName} - Claimed Number
                       </p>
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber}</p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^60?/, "")}</p>
                         <button
                           onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber)}
                           className="p-2 text-slate-400 transition hover:text-cyan-600"
