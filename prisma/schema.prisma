@@ -11,6 +11,7 @@ enum OrderStatus {
   pending_payment
   paid
   active
+  shipped
   depleted
   cancelled
 }
