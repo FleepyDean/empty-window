@@ -1,4 +1,4 @@
-import { getNumber, cancelNumber } from "@/lib/herosms";
+import { getNumberCheapest, cancelNumber } from "@/lib/herosms";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   await cleanupExpiredClaims(trimmedOrderId);
 
   try {
-    const heroNumber = await getNumber(heroServiceCode);
+    const heroNumber = await getNumberCheapest(heroServiceCode);
 
     // Create claim and deduct quantity in a transaction
     const claim = await prisma.$transaction(async (tx) => {

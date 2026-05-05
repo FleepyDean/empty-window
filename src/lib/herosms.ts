@@ -24,14 +24,38 @@ async function heroRequest(params: Record<string, string>) {
   return text;
 }
 
-export async function getNumber(service = DEFAULT_SERVICE) {
+export async function getMinPrice(service: string, country = DEFAULT_COUNTRY): Promise<number | null> {
+  try {
+    const { prices } = await getPrices(service, country);
+    // prices shape: { "<country>": { "<service>": { "cost": X, "count": Y } } }
+    let min: number | null = null;
+    for (const countryData of Object.values(prices) as Record<string, { cost?: number; count?: number }>[]) {
+      const svc = countryData[service];
+      if (svc && typeof svc.cost === "number" && svc.count && svc.count > 0) {
+        if (min === null || svc.cost < min) min = svc.cost;
+      }
+    }
+    return min;
+  } catch {
+    return null;
+  }
+}
+
+export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {
   // Equivalent format:
-  // /stubs/handler_api.php?action=getNumber&service=<service>&country=<country>&api_key=<token>
-  const raw = await heroRequest({
+  // /stubs/handler_api.php?action=getNumber&service=<service>&country=<country>&maxPrice=<price>&api_key=<token>
+  const params: Record<string, string> = {
     action: "getNumber" satisfies HeroAction,
     service,
     country: DEFAULT_COUNTRY
-  });
+  };
+
+  // Pass maxPrice if provided — HeroSMS will allocate from cheapest pool at or below this price
+  if (maxPrice !== undefined) {
+    params.maxPrice = String(maxPrice);
+  }
+
+  const raw = await heroRequest(params);
 
   // Expected: ACCESS_NUMBER:<id>:<number>
   const parts = raw.split(":");
@@ -44,6 +68,11 @@ export async function getNumber(service = DEFAULT_SERVICE) {
     phoneNumber: parts[2],
     service
   };
+}
+
+export async function getNumberCheapest(service = DEFAULT_SERVICE) {
+  const minPrice = await getMinPrice(service);
+  return getNumber(service, minPrice ?? undefined);
 }
 
 export async function getOtp(activationId: string) {
