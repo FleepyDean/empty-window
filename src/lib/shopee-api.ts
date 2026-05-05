@@ -74,6 +74,10 @@ export function buildAuthUrl(path: string): string {
   return `${SHOPEE_API_BASE}${path}?${params.toString()}`;
 }
 
+export function getApiBase(): string {
+  return SHOPEE_API_BASE;
+}
+
 export async function shopeeGet<T>(
   path: string,
   params: Record<string, string | number> = {},
