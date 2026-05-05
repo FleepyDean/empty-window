@@ -141,6 +141,33 @@ type ProductContent = {
   hasCustomSteps: boolean;
 };
 
+function sanitizeVideoUrl(url: string): string {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") {
+      if (u.pathname.startsWith("/embed/")) {
+        const clean = new URL(url.replace("youtube.com", "youtube-nocookie.com"));
+        clean.searchParams.set("rel", "0");
+        clean.searchParams.set("modestbranding", "1");
+        return clean.toString();
+      }
+      const videoId = u.searchParams.get("v");
+      if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+    }
+    if (u.hostname === "youtu.be") {
+      const videoId = u.pathname.slice(1);
+      if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+    }
+    if (u.hostname === "www.youtube-nocookie.com" || u.hostname === "youtube-nocookie.com") {
+      u.searchParams.set("rel", "0");
+      u.searchParams.set("modestbranding", "1");
+      return u.toString();
+    }
+  } catch { /* not a valid URL */ }
+  return url;
+}
+
 const PRODUCT_OPTIONS = [
   { key: "zus", name: "ZUS Coffee" },
   { key: "chagee", name: "Chagee" },
@@ -693,17 +720,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         YouTube Embed URL
                       </label>
                       <p className="mt-0.5 text-xs text-slate-400">
-                        Use embed format: https://www.youtube.com/embed/VIDEO_ID
+                        Paste any YouTube link — watch, share, or embed URL. Auto-converted to privacy-enhanced embed.
                       </p>
                       <input
                         value={editVideoUrl}
                         onChange={(e) => setEditVideoUrl(e.target.value)}
-                        placeholder="https://www.youtube.com/embed/..."
+                        placeholder="Paste any YouTube link: youtube.com/watch?v=... or youtu.be/..."
                         className="mt-1 w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                       />
                       {editVideoUrl && (
                         <div className="mt-2 aspect-video w-full max-w-sm overflow-hidden border border-slate-200 bg-black dark:border-slate-700">
-                          <iframe src={editVideoUrl} className="h-full w-full" allowFullScreen title="preview" />
+                          <iframe src={sanitizeVideoUrl(editVideoUrl)} className="h-full w-full" allowFullScreen title="preview" />
                         </div>
                       )}
                     </div>

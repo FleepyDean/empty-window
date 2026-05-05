@@ -63,6 +63,35 @@ const DEFAULT_STEPS: Record<string, string[]> = {
   ],
 };
 
+function sanitizeVideoUrl(url: string): string {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    // Handle youtube.com/watch?v=ID or youtu.be/ID — convert to embed
+    if (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") {
+      if (u.pathname.startsWith("/embed/")) {
+        // Already embed — just switch to nocookie
+        const clean = new URL(url.replace("youtube.com", "youtube-nocookie.com"));
+        clean.searchParams.set("rel", "0");
+        clean.searchParams.set("modestbranding", "1");
+        return clean.toString();
+      }
+      const videoId = u.searchParams.get("v");
+      if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+    }
+    if (u.hostname === "youtu.be") {
+      const videoId = u.pathname.slice(1);
+      if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+    }
+    if (u.hostname === "www.youtube-nocookie.com" || u.hostname === "youtube-nocookie.com") {
+      u.searchParams.set("rel", "0");
+      u.searchParams.set("modestbranding", "1");
+      return u.toString();
+    }
+  } catch { /* not a valid URL, return as-is */ }
+  return url;
+}
+
 export default function TutorialPage() {
   const [selected, setSelected] = useState<string>(PRODUCT_CATALOG[0].key);
   const [tutorials, setTutorials] = useState<TutorialEntry[]>([]);
@@ -145,7 +174,7 @@ export default function TutorialPage() {
               {tutorial?.tutorialVideoUrl ? (
                 <div className="aspect-video w-full overflow-hidden border border-slate-200 bg-black dark:border-slate-700">
                   <iframe
-                    src={tutorial.tutorialVideoUrl}
+                    src={sanitizeVideoUrl(tutorial.tutorialVideoUrl!)}
                     title={`${product.name} tutorial`}
                     className="h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
