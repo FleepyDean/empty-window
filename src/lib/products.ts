@@ -108,7 +108,7 @@ const KFC_INSTRUCTIONS = `📦 Strictly for PICKUP
 - Open KFC app and make sure you're logged out
 - Insert phone number given and wait for OTP
 - Insert random name and email
-- DO NOT ENTER ANY REFERRAL CODE! SKIP THE REFERRAL SECTION!
+- Enter referral code "W4PQJETW" for RM8 BONUS
 
 After registration and login:
 Go to: Order Now → Offers & Rewards → Check for the vouchers
