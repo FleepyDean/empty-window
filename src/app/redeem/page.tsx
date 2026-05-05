@@ -54,6 +54,7 @@ type ActiveClaim = {
 const OTP_POLL_INTERVAL_MS = 5000;
 const CLAIM_DURATION_MS = 15 * 60 * 1000;
 const ACTIVE_CLAIM_ID_KEY = "nishinae.activeClaimId";
+const LAST_ORDER_ID_KEY = "nishinae.lastOrderId";
 
 function RedeemPageContent() {
   const searchParams = useSearchParams();
@@ -124,12 +125,7 @@ function RedeemPageContent() {
 
       setOrderDetails(data);
       setActiveTab("products");
-      setClaimState("idle");
-      setActiveClaim(null);
-      setOtp(null);
-      setExpiresAt(null);
-      setTimeLeftMs(0);
-      clearActiveClaimId();
+      localStorage.setItem(LAST_ORDER_ID_KEY, orderIdInput.trim());
       toast.success(`Order validated. ${data.products.length} product(s) found.`);
     } catch {
       toast.error("Could not validate order. Try again.");
@@ -315,6 +311,46 @@ function RedeemPageContent() {
     void restoreSession();
   }, []);
 
+  // Auto-revalidate last order on mount so refresh keeps users on the same page
+  useEffect(() => {
+    const savedOrderId = localStorage.getItem(LAST_ORDER_ID_KEY);
+    if (!savedOrderId || orderDetails) return;
+    setOrderIdInput(savedOrderId);
+    (async () => {
+      try {
+        const response = await fetch("/api/orders/details", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: savedOrderId })
+        });
+        const data = (await response.json()) as OrderDetailsResponse;
+        if (response.ok && data.valid) {
+          setOrderDetails(data);
+        } else {
+          localStorage.removeItem(LAST_ORDER_ID_KEY);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Link restored activeClaim to a product once orderDetails is loaded
+  useEffect(() => {
+    if (!activeClaim || !orderDetails || claimingProduct) return;
+    const match = orderDetails.products.find(
+      (p) => p.productName === activeClaim.productName || p.productKey === activeClaim.productKey
+    );
+    if (match) {
+      setClaimingProduct(match);
+      if (activeClaim.productKey === "unknown") {
+        setActiveClaim({ ...activeClaim, productKey: match.productKey });
+      }
+      if (!claimStartTime) setClaimStartTime(Date.now());
+    }
+  }, [activeClaim, orderDetails, claimingProduct, claimStartTime]);
+
   // Refresh order details after successful claim
   useEffect(() => {
     if (claimState === "success" && orderDetails) {
@@ -479,9 +515,9 @@ function RedeemPageContent() {
                         {activeClaim.productName} - Claimed Number
                       </p>
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^60?/, "")}</p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^6/, "")}</p>
                         <button
-                          onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber?.replace(/^60?/, "") ?? "")}
+                          onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber?.replace(/^6/, "") ?? "")}
                           className="p-2 text-slate-400 transition hover:text-cyan-600"
                           title="Copy number"
                         >
