@@ -1,0 +1,48 @@
+{
+  "Name": "shopee-full-auto-fetch-and-ship",
+  "CreationDate": "2026-5-4",
+  "Commands": [
+    {
+      "Command": "executeScript",
+      "Target": "window.location.reload();",
+      "Value": "",
+      "Description": "Refresh page to get latest orders"
+    },
+    {
+      "Command": "pause",
+      "Target": "5000",
+      "Value": "",
+      "Description": "Wait for page reload"
+    },
+    {
+      "Command": "executeScript",
+      "Target": "var API_BASE = 'https://nishinae.store'; var body = document.body ? document.body.innerText : ''; var re = /Order\\s*ID\\s*[:\\-]?\\s*([A-Z0-9]{10,})/gi; var matches = []; var m; while ((m = re.exec(body)) !== null) { if (!matches.includes(m[1])) matches.push(m[1]); } if (matches.length === 0) { return JSON.stringify({count: 0, orders: []}); } var orders = []; for (var i = 0; i < matches.length; i++) { var sid = matches[i]; var idx = body.indexOf(sid, i === 0 ? 0 : body.indexOf(matches[i-1]) + 10); var section = body.substring(idx, Math.min(body.length, idx + 600)); var lines = section.split(/[\\n\\r]+/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 3; }); var items = []; for (var j = 0; j < lines.length; j++) { var line = lines[j]; var qm = line.match(/^(.{10,}?)\\s*x\\s*(\\d+)\\s*$/i); if (qm && items.length === 0) { items.push({ productName: qm[1].trim(), quantity: parseInt(qm[2], 10) }); break; } } if (items.length === 0) { for (var k = 0; k < lines.length; k++) { var l2 = lines[k]; if (/zus|chagee|tealive|kfc|cbtl|gigi/i.test(l2.toLowerCase()) && l2.length > 10) { items.push({ productName: l2, quantity: 1 }); break; } } } orders.push({ shopeeOrderId: sid, items: items }); } var payload = JSON.stringify({ orders: orders }); return fetch(API_BASE + '/api/shopee/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }).then(function(r){ return r.json(); }).then(function(d){ return JSON.stringify({count: matches.length, orderIds: matches, apiResult: d}); }).catch(function(e){ return JSON.stringify({count: matches.length, orderIds: matches, error: e.message}); });",
+      "Value": "fetchResult",
+      "Description": "Extract orders, POST to API, return Order IDs"
+    },
+    {
+      "Command": "executeScript",
+      "Target": "var data = JSON.parse('${fetchResult}'); if (data.count === 0) return 'NO_ORDERS'; var clicked = 0; data.orderIds.forEach(function(oid){ var links = document.querySelectorAll('a'); for (var i = 0; i < links.length; i++) { var link = links[i]; if (link.textContent.trim() === 'Ship' || link.textContent.trim().includes('Ship')) { var parent = link.closest('div, tr, [class*=\"order\"]'); if (parent && parent.textContent.includes(oid)) { link.click(); clicked++; break; } } } }); return 'Clicked ' + clicked + ' Ship buttons for ' + data.count + ' orders';",
+      "Value": "clickResult",
+      "Description": "Click Ship buttons for fetched orders"
+    },
+    {
+      "Command": "echo",
+      "Target": "API: ${fetchResult} | Ship: ${clickResult}",
+      "Value": "",
+      "Description": "Log both API and Ship results"
+    },
+    {
+      "Command": "pause",
+      "Target": "3000",
+      "Value": "",
+      "Description": "Wait for any Ship confirmations"
+    },
+    {
+      "Command": "pause",
+      "Target": "60000",
+      "Value": "",
+      "Description": "Wait 60 seconds before next fetch"
+    }
+  ]
+}

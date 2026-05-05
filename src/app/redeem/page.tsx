@@ -580,7 +580,7 @@ function RedeemPageContent() {
                       />
                       <div className="flex-1">
                         <h3 className="font-medium text-slate-900 dark:text-white">{claim.productName}</h3>
-                        <p className="text-sm font-mono text-slate-600 dark:text-slate-400">{claim.phoneNumber}</p>
+                        <p className="text-sm font-mono text-slate-600 dark:text-slate-400">{claim.phoneNumber?.replace(/^6/, "")}</p>
                       </div>
                       <div className="text-right">
                         {claim.status === "success" && claim.otp ? (
