@@ -481,7 +481,7 @@ function RedeemPageContent() {
                       <div className="mt-2 flex items-center justify-between">
                         <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^60?/, "")}</p>
                         <button
-                          onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber)}
+                          onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber?.replace(/^60?/, "") ?? "")}
                           className="p-2 text-slate-400 transition hover:text-cyan-600"
                           title="Copy number"
                         >
