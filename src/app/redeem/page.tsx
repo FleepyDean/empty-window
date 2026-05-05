@@ -351,6 +351,28 @@ function RedeemPageContent() {
     }
   }, [activeClaim, orderDetails, claimingProduct, claimStartTime]);
 
+  // Detect server-side active claim (waiting_otp) so any device viewing this
+  // order sees the live claim state (not just the original claimer's browser).
+  useEffect(() => {
+    if (!orderDetails || activeClaim) return;
+    const waitingClaim = orderDetails.claims.find((c) => c.status === "waiting_otp");
+    if (!waitingClaim) return;
+    const expiresMs = new Date(waitingClaim.expiresAt).getTime();
+    if (Number.isNaN(expiresMs) || expiresMs <= Date.now()) return;
+    setActiveClaim({
+      claimId: waitingClaim.claimId,
+      phoneNumber: waitingClaim.phoneNumber,
+      productName: waitingClaim.productName,
+      productKey: waitingClaim.productKey,
+      expiresAt: expiresMs
+    });
+    setExpiresAt(expiresMs);
+    setTimeLeftMs(expiresMs - Date.now());
+    setClaimState("waiting_otp");
+    const createdMs = new Date(waitingClaim.createdAt).getTime();
+    setClaimStartTime(Number.isNaN(createdMs) ? Date.now() : createdMs);
+  }, [orderDetails, activeClaim]);
+
   // Refresh order details after successful claim
   useEffect(() => {
     if (claimState === "success" && orderDetails) {
