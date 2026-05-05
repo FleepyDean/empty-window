@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nishinae System — Your Store, On Autopilot</title>
+<meta name="description" content="Plug-and-play e-commerce system for Malaysian OTP voucher resellers. Automate payments, orders and OTP delivery." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="icon" type="image/png" href="icon.png" />
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(139, 92, 246, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(139, 92, 246, 0.08) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  .animate-float { animation: float 3s ease-in-out infinite; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+
+<!-- NAV -->
+<nav class="fixed top-0 left-0 right-0 z-50 border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-lg">
+  <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <div class="flex items-center gap-2">
+      <div class="h-6 w-6 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500"><img src="icon.png" alt="Nishinae System" class="h-6 w-6"></div>
+      <span class="text-lg font-bold">Nishinae System</span>
+    </div>
+    <div class="hidden items-center gap-6 text-sm md:flex">
+      <a href="#features" class="text-slate-400 transition hover:text-white">Features</a>
+      <a href="#pricing" class="text-slate-400 transition hover:text-white">Pricing</a>
+      <a href="#faq" class="text-slate-400 transition hover:text-white">FAQ</a>
+      <a href="https://t.me/nishinaestore" target="_blank" class="rounded-full bg-white px-4 py-2 font-semibold text-slate-950 transition hover:bg-slate-200">Get Started →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="relative overflow-hidden pt-32 pb-20 grid-bg">
+  <div class="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-500/30 blur-3xl"></div>
+  <div class="relative mx-auto max-w-5xl px-6 text-center">
+    <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-violet-300">
+      <span class="relative flex h-2 w-2">
+        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75"></span>
+        <span class="relative inline-flex h-2 w-2 rounded-full bg-violet-500"></span>
+      </span>
+      Built for Malaysian Sellers
+    </div>
+    <h1 class="mb-6 text-5xl font-black leading-tight tracking-tight md:text-7xl">
+      Your Store,<br />
+      <span class="gradient-text">On Autopilot.</span>
+    </h1>
+    <p class="mx-auto mb-10 max-w-2xl text-lg text-slate-400 md:text-xl">
+      Stop replying to messages at 2am. Get a <span class="font-semibold text-white">complete e-commerce system</span> that sells OTP vouchers, collects payments and delivers numbers — automatically, 24/7.
+    </p>
+    <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
+      <a href="#pricing" class="rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 px-8 py-4 text-base font-bold text-white transition hover:scale-105">
+        View Pricing →
+      </a>
+      <a href="https://nishinae.store" target="_blank" class="rounded-full border border-slate-700 bg-slate-900 px-8 py-4 text-base font-semibold text-white transition hover:border-slate-500">
+        💬 Live Website
+      </a>
+    </div>
+    <div class="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-slate-500">
+      <div class="flex items-center gap-2">✅ One-time payment</div>
+      <div class="flex items-center gap-2">✅ No monthly fees</div>
+      <div class="flex items-center gap-2">✅ Fully automated</div>
+      <div class="flex items-center gap-2">✅ Go live in 5 days</div>
+    </div>
+  </div>
+</section>
+
+<!-- PAIN POINTS -->
+<section class="border-y border-slate-800 bg-slate-900/30 py-20">
+  <div class="mx-auto max-w-5xl px-6">
+    <h2 class="mb-4 text-center text-sm font-bold uppercase tracking-wider text-violet-400">The Problem</h2>
+    <p class="mb-12 text-center text-3xl font-bold md:text-4xl">Still selling OTP numbers manually?</p>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+        <span class="text-2xl">😩</span>
+        <p class="text-slate-300">Chasing customers for payment proof every day</p>
+      </div>
+      <div class="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+        <span class="text-2xl">📱</span>
+        <p class="text-slate-300">Replying "boleh" and "berapa" 100 times a day</p>
+      </div>
+      <div class="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+        <span class="text-2xl">⏰</span>
+        <p class="text-slate-300">Losing sleep sending OTP numbers at 2am</p>
+      </div>
+      <div class="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+        <span class="text-2xl">📉</span>
+        <p class="text-slate-300">Losing track of who paid and who didn't</p>
+      </div>
+    </div>
+    <p class="mt-12 text-center text-2xl font-bold text-white">
+      There's a <span class="gradient-text">better way.</span>
+    </p>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="py-24">
+  <div class="mx-auto max-w-7xl px-6">
+    <div class="mb-16 text-center">
+      <h2 class="mb-4 text-sm font-bold uppercase tracking-wider text-cyan-400">Everything Included</h2>
+      <p class="text-4xl font-bold md:text-5xl">What You Get</p>
+    </div>
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-violet-500/50 hover:bg-slate-900">
+        <div class="mb-4 text-4xl">🛒</div>
+        <h3 class="mb-2 text-xl font-bold">Complete Store Website</h3>
+        <p class="text-slate-400">Custom-branded store where customers browse, pay and receive — all in under 60 seconds.</p>
+      </div>
+      <div class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-violet-500/50 hover:bg-slate-900">
+        <div class="mb-4 text-4xl">💳</div>
+        <h3 class="mb-2 text-xl font-bold">Auto Payment Collection</h3>
+        <p class="text-slate-400">ToyyibPay integrated — FPX, debit, credit. Money goes straight to your bank account.</p>
+      </div>
+      <div class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-violet-500/50 hover:bg-slate-900">
+        <div class="mb-4 text-4xl">📱</div>
+        <h3 class="mb-2 text-xl font-bold">Instant OTP Delivery</h3>
+        <p class="text-slate-400">Numbers delivered to customers within seconds of payment. Zero manual work.</p>
+      </div>
+      <div class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-violet-500/50 hover:bg-slate-900">
+        <div class="mb-4 text-4xl">🔐</div>
+        <h3 class="mb-2 text-xl font-bold">Unique Order IDs</h3>
+        <p class="text-slate-400">Every customer gets a one-time redemption code. No duplicates. No cheating.</p>
+      </div>
+      <div class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-violet-500/50 hover:bg-slate-900">
+        <div class="mb-4 text-4xl">⚙️</div>
+        <h3 class="mb-2 text-xl font-bold">Admin Dashboard</h3>
+        <p class="text-slate-400">Every order, payment and transaction in real-time. Edit prices on the fly.</p>
+      </div>
+      <div class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-violet-500/50 hover:bg-slate-900">
+        <div class="mb-4 text-4xl">🌓</div>
+        <h3 class="mb-2 text-xl font-bold">Beautiful, Mobile-First</h3>
+        <p class="text-slate-400">Dark mode / light mode. Looks like a premium SaaS — not a budget template.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="border-y border-slate-800 bg-gradient-to-b from-slate-900/30 to-slate-950 py-24">
+  <div class="mx-auto max-w-4xl px-6">
+    <div class="mb-12 text-center">
+      <h2 class="mb-4 text-sm font-bold uppercase tracking-wider text-amber-400">Manual vs Automated</h2>
+      <p class="text-4xl font-bold md:text-5xl">The Difference is Night &amp; Day</p>
+    </div>
+    <div class="overflow-hidden rounded-2xl border border-slate-800">
+      <table class="w-full text-left">
+        <thead class="border-b border-slate-800 bg-slate-900/50">
+          <tr>
+            <th class="px-6 py-4 text-sm font-bold text-slate-400">Scenario</th>
+            <th class="px-6 py-4 text-sm font-bold text-red-400">Manual Selling</th>
+            <th class="px-6 py-4 text-sm font-bold text-cyan-400">Nishinae System</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800 text-sm">
+          <tr><td class="px-6 py-4 font-semibold">Working hours</td><td class="px-6 py-4 text-slate-400">24/7 reply</td><td class="px-6 py-4 text-white">Site runs 24/7 auto</td></tr>
+          <tr><td class="px-6 py-4 font-semibold">Payment verification</td><td class="px-6 py-4 text-slate-400">Check screenshots</td><td class="px-6 py-4 text-white">Auto-verified</td></tr>
+          <tr><td class="px-6 py-4 font-semibold">OTP delivery</td><td class="px-6 py-4 text-slate-400">Send one by one</td><td class="px-6 py-4 text-white">Instant auto-deliver</td></tr>
+          <tr><td class="px-6 py-4 font-semibold">Order tracking</td><td class="px-6 py-4 text-slate-400">Lost in chats</td><td class="px-6 py-4 text-white">Full dashboard</td></tr>
+          <tr><td class="px-6 py-4 font-semibold">100 orders/day</td><td class="px-6 py-4 text-slate-400">8+ hours work</td><td class="px-6 py-4 text-white">0 hours work</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="py-24">
+  <div class="mx-auto max-w-7xl px-6">
+    <div class="mb-16 text-center">
+      <h2 class="mb-4 text-sm font-bold uppercase tracking-wider text-violet-400">Pricing</h2>
+      <p class="mb-4 text-4xl font-bold md:text-5xl">Pay Once. Own It Forever.</p>
+      <p class="text-slate-400">No monthly fees. No vendor lock-in. No surprises.</p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-3">
+      <!-- STARTER -->
+      <div class="rounded-3xl border border-slate-800 bg-slate-900/50 p-8">
+        <div class="mb-6">
+          <div class="mb-2 text-sm font-bold uppercase tracking-wider text-slate-400">🥉 Starter</div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-5xl font-black">RM 299</span>
+            <span class="text-slate-500">one-time</span>
+          </div>
+          <p class="mt-3 text-sm text-slate-400">Perfect if you already have customers on WhatsApp/Telegram.</p>
+        </div>
+        <ul class="mb-8 space-y-3 text-sm">
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Admin dashboard</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Order redemption page</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> OTP auto-delivery</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Secure admin login</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Order history</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> 1 month free support</li>
+          <li class="flex gap-2 text-slate-600"><span>✗</span> Storefront website</li>
+          <li class="flex gap-2 text-slate-600"><span>✗</span> Payment gateway</li>
+        </ul>
+        <a href="https://t.me/nishinaestore" target="_blank" class="block rounded-xl border border-slate-700 bg-slate-800 px-6 py-3 text-center font-semibold transition hover:border-slate-500">
+          Get Starter
+        </a>
+      </div>
+
+      <!-- PROFESSIONAL -->
+      <div class="relative rounded-3xl border-2 border-violet-500 bg-gradient-to-b from-violet-500/10 to-slate-900/50 p-8 shadow-2xl shadow-violet-500/20">
+        <div class="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 px-4 py-1 text-xs font-bold uppercase tracking-wider text-white">
+          ⭐ Most Popular
+        </div>
+        <div class="mb-6">
+          <div class="mb-2 text-sm font-bold uppercase tracking-wider text-violet-400">🥈 Professional</div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-5xl font-black">RM 599</span>
+            <span class="text-slate-400">one-time</span>
+          </div>
+          <p class="mt-3 text-sm text-slate-300">The complete online store experience.</p>
+        </div>
+        <ul class="mb-8 space-y-3 text-sm">
+          <li class="flex gap-2"><span class="text-green-400">✓</span> <span class="font-semibold">Everything in Starter</span></li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Full storefront website</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Checkout with customer info</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> ToyyibPay (FPX + card)</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Auto Order ID generation</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Success / failure pages</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Custom branding</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Mobile responsive</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> 3 months free support</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Free deployment setup</li>
+        </ul>
+        <a href="https://t.me/nishinaestore" target="_blank" class="block rounded-xl bg-gradient-to-r from-violet-500 to-cyan-500 px-6 py-3 text-center font-bold text-white transition hover:scale-105">
+          Get Professional →
+        </a>
+      </div>
+
+      <!-- ENTERPRISE -->
+      <div class="rounded-3xl border border-slate-800 bg-slate-900/50 p-8">
+        <div class="mb-6">
+          <div class="mb-2 text-sm font-bold uppercase tracking-wider text-amber-400">🥇 Enterprise</div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-5xl font-black">RM 1,299</span>
+          </div>
+          <div class="text-sm text-slate-400">+ RM 99/month maintenance</div>
+          <p class="mt-3 text-sm text-slate-400">For sellers scaling past 100 orders/day.</p>
+        </div>
+        <ul class="mb-8 space-y-3 text-sm">
+          <li class="flex gap-2"><span class="text-green-400">✓</span> <span class="font-semibold">Everything in Professional</span></li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Unlimited products</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Dynamic supplier pricing</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Advanced analytics</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Promo code system</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Bulk discount tiers</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Custom domain + SSL</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> PostgreSQL database</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> White-label (no footer)</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Priority support</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Monthly feature updates</li>
+          <li class="flex gap-2"><span class="text-green-400">✓</span> Backup &amp; recovery</li>
+        </ul>
+        <a href="https://t.me/nishinaestore" target="_blank" class="block rounded-xl border border-amber-500/50 bg-amber-500/10 px-6 py-3 text-center font-semibold text-amber-400 transition hover:bg-amber-500/20">
+          Get Enterprise
+        </a>
+      </div>
+    </div>
+
+    <p class="mt-10 text-center text-sm text-slate-500">
+      💡 Break-even in your first month of sales. Everything after is pure profit.
+    </p>
+  </div>
+</section>
+
+<!-- ADD-ONS -->
+<section class="border-t border-slate-800 bg-slate-900/30 py-24">
+  <div class="mx-auto max-w-4xl px-6">
+    <div class="mb-12 text-center">
+      <h2 class="mb-4 text-sm font-bold uppercase tracking-wider text-cyan-400">Add-Ons</h2>
+      <p class="text-4xl font-bold md:text-5xl">Custom Extras</p>
+    </div>
+    <div class="grid gap-3 md:grid-cols-2">
+      <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><span>Custom logo &amp; branding design</span><span class="font-bold text-cyan-400">RM 150</span></div>
+      <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><span>Extra payment gateway</span><span class="font-bold text-cyan-400">RM 200</span></div>
+      <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><span>Email receipts (SMTP)</span><span class="font-bold text-cyan-400">RM 100</span></div>
+      <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><span>Telegram bot notifications</span><span class="font-bold text-cyan-400">RM 250</span></div>
+      <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><span>Migration from existing system</span><span class="font-bold text-cyan-400">RM 300</span></div>
+      <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><span>Monthly maintenance</span><span class="font-bold text-cyan-400">RM 79/mo</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-24">
+  <div class="mx-auto max-w-3xl px-6">
+    <div class="mb-12 text-center">
+      <h2 class="mb-4 text-sm font-bold uppercase tracking-wider text-violet-400">FAQ</h2>
+      <p class="text-4xl font-bold md:text-5xl">Questions? We've Got Answers.</p>
+    </div>
+    <div class="space-y-3">
+      <details class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-slate-700">
+        <summary class="flex cursor-pointer items-center justify-between font-semibold">
+          I don't know anything about tech. Can I still use this?
+          <span class="text-violet-400 transition group-open:rotate-45">＋</span>
+        </summary>
+        <p class="mt-3 text-slate-400">Yes. We handle the entire setup — domain, hosting, payment gateway, OTP integration. You just provide login credentials and we do the rest.</p>
+      </details>
+      <details class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-slate-700">
+        <summary class="flex cursor-pointer items-center justify-between font-semibold">
+          Can I use my own ToyyibPay / HeroSMS account?
+          <span class="text-violet-400 transition group-open:rotate-45">＋</span>
+        </summary>
+        <p class="mt-3 text-slate-400">Absolutely. We plug in your API keys during setup. All earnings go directly to your accounts.</p>
+      </details>
+      <details class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-slate-700">
+        <summary class="flex cursor-pointer items-center justify-between font-semibold">
+          What if I need changes later?
+          <span class="text-violet-400 transition group-open:rotate-45">＋</span>
+        </summary>
+        <p class="mt-3 text-slate-400">Starter and Professional include free support during the initial period. After that, custom changes are RM 80/hour, or subscribe to Enterprise for ongoing updates.</p>
+      </details>
+      <details class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-slate-700">
+        <summary class="flex cursor-pointer items-center justify-between font-semibold">
+          Is it secure?
+          <span class="text-violet-400 transition group-open:rotate-45">＋</span>
+        </summary>
+        <p class="mt-3 text-slate-400">Yes. Industry-standard encryption, JWT authentication, HMAC-signed admin tokens. Payment processing is handled by ToyyibPay's PCI-compliant servers — we never touch customer card data.</p>
+      </details>
+      <details class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-slate-700">
+        <summary class="flex cursor-pointer items-center justify-between font-semibold">
+          How long until my store goes live?
+          <span class="text-violet-400 transition group-open:rotate-45">＋</span>
+        </summary>
+        <p class="mt-3 text-slate-400">Starter: 2 days. Professional: 5 days. Enterprise: 7-10 days.</p>
+      </details>
+      <details class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-6 transition hover:border-slate-700">
+        <summary class="flex cursor-pointer items-center justify-between font-semibold">
+          Can you support Shopee / Lazada / Stripe?
+          <span class="text-violet-400 transition group-open:rotate-45">＋</span>
+        </summary>
+        <p class="mt-3 text-slate-400">Yes, as a custom add-on. DM us on Telegram for a quote.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="relative overflow-hidden py-24">
+  <div class="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-cyan-600/20"></div>
+  <div class="relative mx-auto max-w-3xl px-6 text-center">
+    <h2 class="mb-6 text-4xl font-black leading-tight md:text-6xl">
+      Stop Replying.<br />
+      <span class="gradient-text">Start Earning.</span>
+    </h2>
+    <p class="mx-auto mb-10 max-w-xl text-lg text-slate-300">
+      Only <span class="font-bold text-white">5 new clients</span> onboarded per month to ensure quality. Secure your slot today.
+    </p>
+    <a href="https://t.me/nishinaestore" target="_blank" class="inline-flex items-center gap-3 rounded-full bg-white px-10 py-5 text-lg font-bold text-slate-950 transition hover:scale-105">
+      💬 DM on Telegram →
+    </a>
+    <p class="mt-6 text-sm text-slate-500">Free demo available before you buy.</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="border-t border-slate-800 py-10">
+  <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 text-sm text-slate-500 md:flex-row">
+    <div class="flex items-center gap-2">
+      <div class="h-6 w-6 rounded bg-gradient-to-br from-violet-500 to-cyan-500"></div>
+      <span>© 2026 Nishinae Store. Built in Malaysia 🇲🇾</span>
+    </div>
+    <div class="flex gap-6">
+      <a href="https://t.me/nishinaestore" target="_blank" class="transition hover:text-white">Telegram</a>
+      <a href="#pricing" class="transition hover:text-white">Pricing</a>
+      <a href="#faq" class="transition hover:text-white">FAQ</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

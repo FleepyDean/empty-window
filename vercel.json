@@ -1,0 +1,8 @@
+{
+  "buildCommand": "prisma generate && prisma db push && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK": "1"
+  }
+}

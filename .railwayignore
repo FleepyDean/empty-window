@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Local env files (railway uses its own env vars)
+.env
+.env.local
+.env.development
+.env.test
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+deploy.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large non-essential files
+*.pptx
+*.zip
+*.tar.gz
+
+# Project-specific non-deployable folders
+mcps/
+agent-transcripts/
+canvases/
+terminals/
+docs/
+scripts/
+.github/
+.windsurf/
+
+# Prisma local DB
+prisma/*.db
+prisma/*.db-journal
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/

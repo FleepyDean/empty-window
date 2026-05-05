@@ -1,0 +1,45 @@
+import { cancelNumber } from "@/lib/herosms";
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function POST(request: Request) {
+  const { claimId } = await request.json();
+
+  if (!claimId || typeof claimId !== "string") {
+    return NextResponse.json({ message: "claimId is required." }, { status: 400 });
+  }
+
+  const claim = await prisma.claim.findUnique({ where: { claimId } });
+  if (!claim) {
+    return NextResponse.json({ message: "Claim session not found." }, { status: 404 });
+  }
+
+  if (claim.status === "waiting_otp" && claim.expiresAt.getTime() <= Date.now()) {
+    try {
+      await cancelNumber(claim.heroActivationId);
+    } catch {
+      // best-effort cancellation; still expire session locally
+    }
+
+    const expiredClaim = await prisma.claim.update({
+      where: { claimId },
+      data: { status: "expired" }
+    });
+
+    return NextResponse.json({
+      claimId: expiredClaim.claimId,
+      phoneNumber: expiredClaim.phoneNumber,
+      expiresAt: expiredClaim.expiresAt.getTime(),
+      status: expiredClaim.status,
+      otp: expiredClaim.otp
+    });
+  }
+
+  return NextResponse.json({
+    claimId: claim.claimId,
+    phoneNumber: claim.phoneNumber,
+    expiresAt: claim.expiresAt.getTime(),
+    status: claim.status,
+    otp: claim.otp
+  });
+}
