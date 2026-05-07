@@ -157,6 +157,7 @@ function RedeemPageContent() {
       setActiveClaimId(data.claimId);
       setReplacementsLeft(data.replacementsLeft);
       setOtp(null);
+      setClaimState("waiting_otp");
       toast.success(`Replacement number issued from ${data.operator} operator.`);
     } catch {
       toast.error("Replacement request failed. Try again.");
@@ -511,36 +512,36 @@ function RedeemPageContent() {
                     {activeClaim && claimingProduct?.productKey === product.productKey ? (
                       <div className="flex items-center gap-2">
                         {claimState === "waiting_otp" && (
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-xs text-amber-600 dark:text-amber-400">Waiting for OTP...</p>
+                              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{countdownLabel}</p>
+                            </div>
+                            <button
+                              onClick={() => cancelClaim("cancelled")}
+                              className="border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-400"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                        {claimState === "success" && otp && (
                           <div className="flex flex-col items-end gap-2">
-                            <div className="flex items-center gap-3">
-                              <div className="text-right">
-                                <p className="text-xs text-amber-600 dark:text-amber-400">Waiting for OTP...</p>
-                                <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{countdownLabel}</p>
-                              </div>
-                              <button
-                                onClick={() => cancelClaim("cancelled")}
-                                className="border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-400"
-                              >
-                                Cancel
-                              </button>
+                            <div className="text-right">
+                              <p className="text-xs text-cyan-600 dark:text-cyan-400">OTP Received</p>
+                              <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400">{otp}</p>
                             </div>
                             <button
                               onClick={requestReplacement}
                               disabled={isReplacing || replacementsLeft === 0}
                               className="border border-orange-400/50 bg-orange-400/10 px-3 py-1.5 text-xs font-medium text-orange-600 transition hover:bg-orange-400/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-orange-400"
-                              title="Number already registered in the app? Get a different one from a different operator."
+                              title="Already tried registering and the number is taken? Get a replacement from a different operator."
                             >
-                              {isReplacing ? "Getting replacement..." : replacementsLeft === 0 ? "No replacements left" : "Already registered? Replace"}
+                              {isReplacing ? "Getting replacement..." : replacementsLeft === 0 ? "No replacements left" : "Number already registered? Replace"}
                             </button>
                             {replacementsLeft !== null && replacementsLeft > 0 && (
                               <p className="text-xs text-slate-400">{replacementsLeft} replacement{replacementsLeft !== 1 ? "s" : ""} left</p>
                             )}
-                          </div>
-                        )}
-                        {claimState === "success" && otp && (
-                          <div className="text-right">
-                            <p className="text-xs text-cyan-600 dark:text-cyan-400">OTP Received</p>
-                            <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400">{otp}</p>
                           </div>
                         )}
                         {claimState === "cancelled" && (
