@@ -43,9 +43,6 @@ export async function POST(request: Request) {
     }, { status: 409 });
   }
 
-  // Pick next operator in rotation (index = currentCount)
-  const nextOperator = MY_OPERATORS[currentCount];
-
   // Resolve the heroServiceCode from the item (cart orders) or order (legacy)
   const heroServiceCode = claim.orderItem
     ? claim.orderItem.heroServiceCode
@@ -75,33 +72,28 @@ export async function POST(request: Request) {
     });
   }
 
-  // Fetch new number from the next operator in rotation
-  try {
-    const heroNumber = await getNumberCheapest(heroServiceCode, nextOperator);
+  // Try operators starting from currentCount index — skip any with 0 availability (NO_NUMBERS)
+  // Fall back to "any operator" if all specific ones are empty
+  let heroNumber: { activationId: string; phoneNumber: string; service: string } | null = null;
+  let usedOperator: string | undefined;
 
-    const newClaim = await prisma.claim.create({
-      data: {
-        claimId: buildClaimId(),
-        orderId: claim.orderId,
-        orderItemId: claim.orderItemId,
-        phoneNumber: heroNumber.phoneNumber,
-        heroActivationId: heroNumber.activationId,
-        expiresAt: new Date(Date.now() + FIFTEEN_MINUTES_MS),
-        status: "waiting_otp",
-        quantityDeducted: true,
-        operator: nextOperator
-      }
-    });
+  const operatorsToTry = [...MY_OPERATORS.slice(currentCount), undefined]; // undefined = any operator
+  for (const op of operatorsToTry) {
+    try {
+      heroNumber = await getNumberCheapest(heroServiceCode, op);
+      usedOperator = op;
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // NO_NUMBERS means this operator has no stock right now — try the next one
+      if (msg.includes("NO_NUMBERS")) continue;
+      // Any other error (network, auth, etc.) — stop and report
+      break;
+    }
+  }
 
-    return NextResponse.json({
-      claimId: newClaim.claimId,
-      phoneNumber: newClaim.phoneNumber,
-      expiresAt: newClaim.expiresAt.getTime(),
-      operator: nextOperator,
-      replacementsLeft: MAX_REPLACEMENTS - (currentCount + 1)
-    });
-  } catch (error) {
-    // New number fetch failed — roll back replacement count and restore qty
+  if (!heroNumber) {
+    // All operators exhausted — roll back replacement count and restore qty
     if (claim.orderItemId) {
       await prisma.orderItem.update({
         where: { id: claim.orderItemId },
@@ -113,8 +105,28 @@ export async function POST(request: Request) {
         data: { quantity: { increment: 1 }, replacementCount: { decrement: 1 } }
       });
     }
-
-    const message = error instanceof Error ? error.message : "Could not get replacement number.";
-    return NextResponse.json({ message }, { status: 502 });
+    return NextResponse.json({ message: "No numbers available from any operator right now. Please try again shortly." }, { status: 502 });
   }
+
+  const newClaim = await prisma.claim.create({
+    data: {
+      claimId: buildClaimId(),
+      orderId: claim.orderId,
+      orderItemId: claim.orderItemId,
+      phoneNumber: heroNumber.phoneNumber,
+      heroActivationId: heroNumber.activationId,
+      expiresAt: new Date(Date.now() + FIFTEEN_MINUTES_MS),
+      status: "waiting_otp",
+      quantityDeducted: true,
+      operator: usedOperator ?? null
+    }
+  });
+
+  return NextResponse.json({
+    claimId: newClaim.claimId,
+    phoneNumber: newClaim.phoneNumber,
+    expiresAt: newClaim.expiresAt.getTime(),
+    operator: usedOperator ?? "any",
+    replacementsLeft: MAX_REPLACEMENTS - (currentCount + 1)
+  });
 }
