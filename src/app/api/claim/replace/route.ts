@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Claim not found." }, { status: 404 });
   }
 
-  if (claim.status !== "waiting_otp") {
+  if (claim.status !== "waiting_otp" && claim.status !== "success") {
     return NextResponse.json({ message: "This claim is no longer active." }, { status: 409 });
   }
 

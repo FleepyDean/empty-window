@@ -77,7 +77,7 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, op
 
 // Malaysian operator rotation pool — used when retrying burned numbers
 export const MY_OPERATORS = ["u_mobile", "hotlink", "digi", "celcom", "yoodo", "xox", "tune_talk", "yes", "unifi"] as const;
-export const MAX_REPLACEMENTS = 5;
+export const MAX_REPLACEMENTS = 1;
 
 export async function getNumberCheapest(service = DEFAULT_SERVICE, operator?: string) {
   if (operator) {
