@@ -93,7 +93,6 @@ type OrderItem = {
   productKey: string;
   productName: string;
   quantity: number;
-  replacementCount: number;
 };
 
 type OrderRow = {
@@ -103,7 +102,6 @@ type OrderRow = {
   productName: string;
   serviceCode: string;
   quantity: number;
-  replacementCount: number;
   status: string;
   isCartOrder: boolean;
   createdAt: string;
@@ -442,25 +440,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       toast.error("Update failed.");
     } finally {
       setSavingOrder(false);
-    }
-  }
-
-  async function grantReplacement(orderId: string, itemId?: number) {
-    try {
-      const res = await fetch("/api/admin/orders/grant-replacement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, itemId })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(`Replacement granted. New count: ${data.replacementCount}`);
-        fetchOrders();
-      } else {
-        toast.error(data.message ?? "Failed to grant replacement.");
-      }
-    } catch {
-      toast.error("Error granting replacement.");
     }
   }
 
@@ -906,37 +885,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     </td>
                     <td className="px-4 py-2">
                       {order.isCartOrder && order.items && order.items.length > 0 ? (
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <span className="text-sm text-slate-700 dark:text-slate-300">{item.productName} x{item.quantity}</span>
-                              {item.replacementCount > 0 && (
-                                <span className="inline-flex items-center gap-1 rounded bg-orange-500/10 px-1.5 py-0.5 text-xs text-orange-600 dark:text-orange-400">
-                                  replaced {item.replacementCount}×
-                                  <button
-                                    onClick={() => grantReplacement(order.orderId, item.id)}
-                                    className="font-bold hover:text-orange-500"
-                                    title="Grant 1 more replacement"
-                                  >+1</button>
-                                </span>
-                              )}
+                            <div key={idx} className="text-sm text-slate-700 dark:text-slate-300">
+                              {item.productName} x{item.quantity}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-700 dark:text-slate-300">{order.productName}</span>
-                          {order.replacementCount > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded bg-orange-500/10 px-1.5 py-0.5 text-xs text-orange-600 dark:text-orange-400">
-                              replaced {order.replacementCount}×
-                              <button
-                                onClick={() => grantReplacement(order.orderId)}
-                                className="font-bold hover:text-orange-500"
-                                title="Grant 1 more replacement"
-                              >+1</button>
-                            </span>
-                          )}
-                        </div>
+                        <span className="text-slate-700 dark:text-slate-300">{order.productName}</span>
                       )}
                     </td>
                     <td className="px-4 py-2">

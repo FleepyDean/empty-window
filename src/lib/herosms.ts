@@ -41,9 +41,7 @@ export async function getMinPrice(service: string, country = DEFAULT_COUNTRY): P
   }
 }
 
-export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, operator?: string) {
-  // Equivalent format:
-  // /stubs/handler_api.php?action=getNumber&service=<service>&country=<country>&maxPrice=<price>&operator=<op>&api_key=<token>
+export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {
   const params: Record<string, string> = {
     action: "getNumber" satisfies HeroAction,
     service,
@@ -53,11 +51,6 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, op
   // Pass maxPrice if provided — HeroSMS will allocate from cheapest pool at or below this price
   if (maxPrice !== undefined) {
     params.maxPrice = String(maxPrice);
-  }
-
-  // Pass specific operator if provided — forces number from that operator's pool
-  if (operator) {
-    params.operator = operator;
   }
 
   const raw = await heroRequest(params);
@@ -75,15 +68,7 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, op
   };
 }
 
-// Malaysian operator rotation pool — used when retrying burned numbers
-export const MY_OPERATORS = ["u_mobile", "hotlink", "digi", "celcom", "yoodo", "xox", "tune_talk", "yes", "unifi"] as const;
-export const MAX_REPLACEMENTS = 1;
-
-export async function getNumberCheapest(service = DEFAULT_SERVICE, operator?: string) {
-  if (operator) {
-    // Specific operator requested — skip price-based selection (pool may differ)
-    return getNumber(service, undefined, operator);
-  }
+export async function getNumberCheapest(service = DEFAULT_SERVICE) {
   const minPrice = await getMinPrice(service);
   return getNumber(service, minPrice ?? undefined);
 }
