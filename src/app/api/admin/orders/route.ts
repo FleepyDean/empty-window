@@ -138,7 +138,7 @@ export async function PATCH(request: Request) {
     data.orderId = newOrderId.trim();
   }
 
-  if (typeof newQuantity === "number" && newQuantity >= 1) {
+  if (typeof newQuantity === "number" && newQuantity >= 0) {
     data.quantity = newQuantity;
   }
 

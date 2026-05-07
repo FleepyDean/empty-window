@@ -900,9 +900,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       {editingOrder === order.orderId ? (
                         <input
                           type="number"
-                          min={1}
+                          min={0}
                           value={editQuantity}
-                          onChange={(e) => setEditQuantity(parseInt(e.target.value, 10) || 1)}
+                          onChange={(e) => setEditQuantity(parseInt(e.target.value, 10) || 0)}
                           className="w-20 border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                         />
                       ) : (
