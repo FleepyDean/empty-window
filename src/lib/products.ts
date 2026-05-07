@@ -13,7 +13,7 @@ export type ProductConfig = {
 const ZUS_INSTRUCTIONS = `📦 Preferably for PICKUP — If want DELIVERY, remark your own phone number before checkout.
 
 ✅ Steps to Redeem the Voucher (READ CAREFULLY):
-- Open ZUS app and make sure you're logged out
+- Open ZUS Coffee app and make sure you're logged out
 - Insert phone number given and click send "SMS" - NOT "WHATSAPP" (IMPORTANT)
 - Insert random name and email
 - For Date of Birth, fill in tomorrow's date with any year. (Receive Buy 1 Free 1 Cake birthday redemption the next day)
