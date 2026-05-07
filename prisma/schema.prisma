@@ -28,6 +28,7 @@ enum ClaimStatus {
   success
   cancelled
   expired
+  replaced
 }
 
 model Order {
@@ -42,6 +43,7 @@ model Order {
   // New multi-product cart support
   items     OrderItem[]
   isCartOrder Boolean   @default(false)
+  replacementCount Int  @default(0)
   status    OrderStatus @default(pending_payment)
   source    String      @default("web") // "web" | "shopee" | "admin"
   externalRef String?   @unique // Shopee Order ID for dedup
@@ -62,6 +64,7 @@ model OrderItem {
   heroServiceCode String
   quantity        Int
   remainingQty    Int      // Quantity left to claim
+  replacementCount Int    @default(0)
   pricePerUnit    Decimal  @default(0)
   claims          Claim[]
   createdAt       DateTime @default(now())
@@ -108,6 +111,7 @@ model Claim {
   otp              String?
   expiresAt        DateTime
   quantityDeducted Boolean     @default(false)
+  operator         String?     // HeroSMS operator used (null = any)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 

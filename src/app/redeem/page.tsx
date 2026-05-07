@@ -74,6 +74,8 @@ function RedeemPageContent() {
   const [claimStartTime, setClaimStartTime] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const [claimingProduct, setClaimingProduct] = useState<OrderProduct | null>(null);
+  const [replacementsLeft, setReplacementsLeft] = useState<number | null>(null);
+  const [isReplacing, setIsReplacing] = useState(false);
 
   const CANCEL_COOLDOWN_MS = 2 * 60 * 1000;
   const cancelElapsedMs = claimStartTime ? nowMs - claimStartTime : 0;
@@ -134,6 +136,35 @@ function RedeemPageContent() {
     }
   }
 
+  async function requestReplacement() {
+    if (!activeClaim?.claimId || isReplacing) return;
+    setIsReplacing(true);
+    try {
+      const res = await fetch("/api/claim/replace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimId: activeClaim.claimId })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message ?? "Could not get replacement.");
+        return;
+      }
+      setActiveClaim((prev) => prev ? { ...prev, claimId: data.claimId, phoneNumber: data.phoneNumber, expiresAt: data.expiresAt } : null);
+      setExpiresAt(data.expiresAt);
+      setTimeLeftMs(data.expiresAt - Date.now());
+      setClaimStartTime(Date.now());
+      setActiveClaimId(data.claimId);
+      setReplacementsLeft(data.replacementsLeft);
+      setOtp(null);
+      toast.success(`Replacement number issued from ${data.operator} operator.`);
+    } catch {
+      toast.error("Replacement request failed. Try again.");
+    } finally {
+      setIsReplacing(false);
+    }
+  }
+
   async function startClaim(product: OrderProduct) {
     if (!orderDetails) return;
 
@@ -171,6 +202,7 @@ function RedeemPageContent() {
       setClaimState("waiting_otp");
       setClaimStartTime(Date.now());
       setActiveClaimId(data.claimId);
+      setReplacementsLeft(null);
       toast.success(`Number claimed for ${product.productName}. Waiting for OTP.`);
     } catch {
       toast.error("Claim failed. Please retry.");
@@ -479,17 +511,30 @@ function RedeemPageContent() {
                     {activeClaim && claimingProduct?.productKey === product.productKey ? (
                       <div className="flex items-center gap-2">
                         {claimState === "waiting_otp" && (
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="text-xs text-amber-600 dark:text-amber-400">Waiting for OTP...</p>
-                              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{countdownLabel}</p>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <p className="text-xs text-amber-600 dark:text-amber-400">Waiting for OTP...</p>
+                                <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{countdownLabel}</p>
+                              </div>
+                              <button
+                                onClick={() => cancelClaim("cancelled")}
+                                className="border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-400"
+                              >
+                                Cancel
+                              </button>
                             </div>
                             <button
-                              onClick={() => cancelClaim("cancelled")}
-                              className="border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-400"
+                              onClick={requestReplacement}
+                              disabled={isReplacing || replacementsLeft === 0}
+                              className="border border-orange-400/50 bg-orange-400/10 px-3 py-1.5 text-xs font-medium text-orange-600 transition hover:bg-orange-400/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-orange-400"
+                              title="Number already registered in the app? Get a different one from a different operator."
                             >
-                              Cancel
+                              {isReplacing ? "Getting replacement..." : replacementsLeft === 0 ? "No replacements left" : "Already registered? Replace"}
                             </button>
+                            {replacementsLeft !== null && replacementsLeft > 0 && (
+                              <p className="text-xs text-slate-400">{replacementsLeft} replacement{replacementsLeft !== 1 ? "s" : ""} left</p>
+                            )}
                           </div>
                         )}
                         {claimState === "success" && otp && (
