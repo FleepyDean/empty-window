@@ -32,7 +32,27 @@ Even if the phone number shown is different, it will log back into the same acco
 ⚠️ Do not log into any other ZUS account — the number will be burned after 15 minutes and you won't be able to log in again.
 ✅ Please follow all instructions carefully.
 
-We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
+We do not take any responsibility for any errors caused by own failure to follow the steps above.
+
+---
+
+⚠️ BUY1FREE1 Voucher Not Appearing / "Maximum Usage" Error?
+
+Some accounts may encounter a "Sorry, you have reached the maximum usage limit of this voucher" error when trying to claim the BUY1FREE1 code, even on a brand new account. This is a known issue on ZUS Coffee's end.
+
+To fix this, contact ZUS Coffee Customer Service directly on WhatsApp:
+
+📞 WhatsApp: 0128161340
+
+What to say:
+1. Tell them you are a first-time user and just downloaded the app
+2. Say you are unable to claim the BUY1FREE1 voucher
+3. Send a screenshot of your Voucher/Wallet page showing the error
+4. Provide your registered phone number in the app
+
+⚠️ Important: Do NOT mention anything about purchasing or buying the number. Simply say you are a new user registering for the first time.
+
+ZUS Coffee support will manually add the voucher to your account. This usually takes a short while after the chat.`;
 
 const CHAGEE_INSTRUCTIONS = `📦 Strictly for PICKUP
 
