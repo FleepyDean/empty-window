@@ -120,7 +120,7 @@ function getLogoUrl(productKey: string): string {
     kfc: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png",
     cbtl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg",
     gigi: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png",
-    winrar: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/WinRAR_icon.png/220px-WinRAR_icon.png"
+    winrar: "https://images.wincrunch.com/winrar-logo.png"
   };
   return logos[productKey] || "";
 }

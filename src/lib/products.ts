@@ -160,7 +160,7 @@ export const PRODUCT_CATALOG: ProductConfig[] = [
   { key: "kfc", productType: "otp", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
   { key: "cbtl", productType: "otp", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
   { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS, productType: "otp" },
-  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/WinRAR_icon.png/220px-WinRAR_icon.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" }
+  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://images.wincrunch.com/winrar-logo.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" }
 ];
 
 export const PRODUCT_MAP: Record<ProductKey, ProductConfig> = PRODUCT_CATALOG.reduce(
