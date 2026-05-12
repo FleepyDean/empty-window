@@ -1,4 +1,4 @@
-export type ProductKey = "zus" | "chagee" | "tealive" | "kfc" | "cbtl" | "gigi";
+export type ProductKey = "zus" | "chagee" | "tealive" | "kfc" | "cbtl" | "gigi" | "winrar";
 
 export type ProductConfig = {
   key: ProductKey;
@@ -8,6 +8,8 @@ export type ProductConfig = {
   priceLabel: string;
   logoUrl: string;
   redemptionInstructions: string;
+  productType: "otp" | "link";
+  linkUrl?: string; // Static link for link-type products
 };
 
 const ZUS_INSTRUCTIONS = `📦 Preferably for PICKUP — If want DELIVERY, remark your own phone number before checkout.
@@ -138,13 +140,27 @@ Go to: Order Now → Offers & Rewards → Check for the vouchers
 
 We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
 
+const WINRAR_INSTRUCTIONS = `💻 WinRAR Lifetime License
+
+✅ Steps to Activate:
+1. Click the "Get Link" button to access the download folder
+2. Download and install WinRAR from the folder
+3. Follow the instructions in the README file included
+4. Enjoy your lifetime WinRAR license!
+
+⚠️ Do not share the link with anyone else.
+✅ Please follow all instructions carefully.
+
+We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
+
 export const PRODUCT_CATALOG: ProductConfig[] = [
-  { key: "zus", name: "ZUS Coffee", serviceCode: "aik", heroServiceCode: "aik", priceLabel: "RM 0.00", logoUrl: "https://resources.wobbjobs.com/jobs-malaysia/companies/2cced996-255d-4525-812b-e9319b8ce8f2/company_logo/original/13f90cff-059d-435e-b166-794a51360600-logo.jpg", redemptionInstructions: ZUS_INSTRUCTIONS },
-  { key: "chagee", name: "Chagee", serviceCode: "bwx", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s", redemptionInstructions: CHAGEE_INSTRUCTIONS },
-  { key: "tealive", name: "Tealive", serviceCode: "avb", heroServiceCode: "avb", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_INSTRUCTIONS },
-  { key: "kfc", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
-  { key: "cbtl", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
-  { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS }
+  { key: "zus", productType: "otp", name: "ZUS Coffee", serviceCode: "aik", heroServiceCode: "aik", priceLabel: "RM 0.00", logoUrl: "https://resources.wobbjobs.com/jobs-malaysia/companies/2cced996-255d-4525-812b-e9319b8ce8f2/company_logo/original/13f90cff-059d-435e-b166-794a51360600-logo.jpg", redemptionInstructions: ZUS_INSTRUCTIONS },
+  { key: "chagee", productType: "otp", name: "Chagee", serviceCode: "bwx", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s", redemptionInstructions: CHAGEE_INSTRUCTIONS },
+  { key: "tealive", productType: "otp", name: "Tealive", serviceCode: "avb", heroServiceCode: "avb", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_INSTRUCTIONS },
+  { key: "kfc", productType: "otp", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
+  { key: "cbtl", productType: "otp", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
+  { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS, productType: "otp" },
+  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/WinRAR_icon.png/220px-WinRAR_icon.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" }
 ];
 
 export const PRODUCT_MAP: Record<ProductKey, ProductConfig> = PRODUCT_CATALOG.reduce(

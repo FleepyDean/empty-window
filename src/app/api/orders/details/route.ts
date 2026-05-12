@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { PRODUCT_MAP } from "@/lib/products";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -49,7 +50,9 @@ export async function POST(request: Request) {
         totalQuantity: item.quantity,
         remainingQty: item.remainingQty,
         canClaim: item.remainingQty > 0,
-        logoUrl: getLogoUrl(item.productKey)
+        logoUrl: getLogoUrl(item.productKey),
+        productType: PRODUCT_MAP[item.productKey as keyof typeof PRODUCT_MAP]?.productType ?? "otp",
+        linkUrl: PRODUCT_MAP[item.productKey as keyof typeof PRODUCT_MAP]?.linkUrl ?? null
       }))
     : [
         {
@@ -61,7 +64,9 @@ export async function POST(request: Request) {
           totalQuantity: order.quantity,
           remainingQty: order.quantity,
           canClaim: order.quantity > 0,
-          logoUrl: getLogoUrl(order.productKey)
+          logoUrl: getLogoUrl(order.productKey),
+          productType: PRODUCT_MAP[order.productKey as keyof typeof PRODUCT_MAP]?.productType ?? "otp",
+          linkUrl: PRODUCT_MAP[order.productKey as keyof typeof PRODUCT_MAP]?.linkUrl ?? null
         }
       ];
 
@@ -114,7 +119,8 @@ function getLogoUrl(productKey: string): string {
     tealive: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s",
     kfc: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png",
     cbtl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg",
-    gigi: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png"
+    gigi: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png",
+    winrar: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/WinRAR_icon.png/220px-WinRAR_icon.png"
   };
   return logos[productKey] || "";
 }

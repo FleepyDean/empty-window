@@ -29,6 +29,8 @@ type OrderProduct = {
   remainingQty: number;
   canClaim: boolean;
   logoUrl: string;
+  productType: "otp" | "link";
+  linkUrl: string | null;
 };
 
 type ClaimHistoryItem = {
@@ -74,6 +76,7 @@ function RedeemPageContent() {
   const [claimStartTime, setClaimStartTime] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const [claimingProduct, setClaimingProduct] = useState<OrderProduct | null>(null);
+  const [revealedLinks, setRevealedLinks] = useState<Set<string>>(new Set());
 
   const CANCEL_COOLDOWN_MS = 2 * 60 * 1000;
   const cancelElapsedMs = claimStartTime ? nowMs - claimStartTime : 0;
@@ -471,12 +474,41 @@ function RedeemPageContent() {
                     />
                     <div className="flex-1">
                       <h3 className="font-semibold text-slate-900 dark:text-white">{product.productName}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {product.remainingQty} of {product.totalQuantity} remaining
-                      </p>
+                      {product.productType === "otp" && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {product.remainingQty} of {product.totalQuantity} remaining
+                        </p>
+                      )}
                     </div>
 
-                    {activeClaim && claimingProduct?.productKey === product.productKey ? (
+                    {product.productType === "link" ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setInfoModalProduct(PRODUCT_MAP[product.productKey as keyof typeof PRODUCT_MAP])}
+                          className="p-2 text-slate-400 transition hover:text-violet-600 dark:text-slate-500 dark:hover:text-violet-400"
+                          title="View redemption info"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        </button>
+                        {revealedLinks.has(product.productKey) ? (
+                          <a
+                            href={product.linkUrl ?? "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-600 dark:text-slate-950 dark:hover:bg-violet-400"
+                          >
+                            Open Link
+                          </a>
+                        ) : (
+                          <button
+                            onClick={() => setRevealedLinks((prev) => new Set(prev).add(product.productKey))}
+                            className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600 dark:text-slate-950 dark:hover:bg-cyan-400"
+                          >
+                            Get Link
+                          </button>
+                        )}
+                      </div>
+                    ) : activeClaim && claimingProduct?.productKey === product.productKey ? (
                       <div className="flex items-center gap-2">
                         {claimState === "waiting_otp" && (
                           <div className="flex items-center gap-3">
