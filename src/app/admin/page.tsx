@@ -175,6 +175,7 @@ const PRODUCT_OPTIONS = [
   { key: "kfc", name: "KFC" },
   { key: "cbtl", name: "Coffee Bean & Tea Leaf" },
   { key: "gigi", name: "Gigi Coffee" },
+  { key: "winrar", name: "WinRAR" },
 ];
 
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {

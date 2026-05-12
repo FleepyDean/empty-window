@@ -16,6 +16,7 @@ export function matchProductByKeyword(rawName: string): ProductConfig | null {
     { keywords: ["chagee", "cha gee"], key: "chagee" },
     { keywords: ["tealive", "tea live"], key: "tealive" },
     { keywords: ["kfc", "kentucky"], key: "kfc" },
+    { keywords: ["winrar", "win rar"], key: "winrar" },
   ];
 
   for (const { keywords, key } of keywordMap) {
