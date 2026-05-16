@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/theme";
 import { PRODUCT_MAP, ProductConfig, isProductKey } from "@/lib/products";
 import { toast } from "sonner";
@@ -60,7 +60,10 @@ const LAST_ORDER_ID_KEY = "nishinae.lastOrderId";
 
 function RedeemPageContent() {
   const searchParams = useSearchParams();
-  const [orderIdInput, setOrderIdInput] = useState(searchParams.get("orderId") ?? "");
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlOrderId = searchParams.get("orderId") ?? "";
+  const [orderIdInput, setOrderIdInput] = useState(urlOrderId);
   const [orderDetails, setOrderDetails] = useState<OrderDetailsResponse | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [activeTab, setActiveTab] = useState<"products" | "activations">("products");
@@ -128,7 +131,12 @@ function RedeemPageContent() {
 
       setOrderDetails(data);
       setActiveTab("products");
-      localStorage.setItem(LAST_ORDER_ID_KEY, orderIdInput.trim());
+      const trimmed = orderIdInput.trim();
+      localStorage.setItem(LAST_ORDER_ID_KEY, trimmed);
+      // Persist orderId in URL so refresh / in-app browser navigation retains state
+      if (urlOrderId !== trimmed) {
+        router.replace(`${pathname}?orderId=${encodeURIComponent(trimmed)}`);
+      }
       toast.success(`Order validated. ${data.products.length} product(s) found.`);
     } catch {
       toast.error("Could not validate order. Try again.");
@@ -314,22 +322,27 @@ function RedeemPageContent() {
     void restoreSession();
   }, []);
 
-  // Auto-revalidate last order on mount so refresh keeps users on the same page
+  // Auto-revalidate from URL (preferred) or last-saved localStorage on mount
   useEffect(() => {
-    const savedOrderId = localStorage.getItem(LAST_ORDER_ID_KEY);
-    if (!savedOrderId || orderDetails) return;
-    setOrderIdInput(savedOrderId);
+    if (orderDetails) return;
+    const targetId = urlOrderId || localStorage.getItem(LAST_ORDER_ID_KEY) || "";
+    if (!targetId) return;
+    setOrderIdInput(targetId);
     (async () => {
       try {
         const response = await fetch("/api/orders/details", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: savedOrderId })
+          body: JSON.stringify({ orderId: targetId })
         });
         const data = (await response.json()) as OrderDetailsResponse;
         if (response.ok && data.valid) {
           setOrderDetails(data);
-        } else {
+          localStorage.setItem(LAST_ORDER_ID_KEY, targetId);
+          if (urlOrderId !== targetId) {
+            router.replace(`${pathname}?orderId=${encodeURIComponent(targetId)}`);
+          }
+        } else if (!urlOrderId) {
           localStorage.removeItem(LAST_ORDER_ID_KEY);
         }
       } catch {
@@ -337,7 +350,26 @@ function RedeemPageContent() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [urlOrderId]);
+
+  // Continuously poll order details so any device viewing the same order sees the live state
+  useEffect(() => {
+    if (!orderDetails) return;
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch("/api/orders/details", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: orderDetails.orderId })
+        });
+        const data = (await response.json()) as OrderDetailsResponse;
+        if (response.ok && data.valid) setOrderDetails(data);
+      } catch {
+        // ignore transient errors
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [orderDetails?.orderId]);
 
   // Link restored activeClaim to a product once orderDetails is loaded
   useEffect(() => {
@@ -356,25 +388,42 @@ function RedeemPageContent() {
 
   // Detect server-side active claim (waiting_otp) so any device viewing this
   // order sees the live claim state (not just the original claimer's browser).
+  // Also reacts to server-side claim expirations / status changes.
   useEffect(() => {
-    if (!orderDetails || activeClaim) return;
+    if (!orderDetails) return;
     const waitingClaim = orderDetails.claims.find((c) => c.status === "waiting_otp");
-    if (!waitingClaim) return;
+
+    if (!waitingClaim) {
+      // No server-side waiting claim. If we currently show one, clear it.
+      if (activeClaim && claimState === "waiting_otp") {
+        setActiveClaim(null);
+        setExpiresAt(null);
+        setTimeLeftMs(0);
+        setClaimState("idle");
+        setClaimingProduct(null);
+      }
+      return;
+    }
+
     const expiresMs = new Date(waitingClaim.expiresAt).getTime();
     if (Number.isNaN(expiresMs) || expiresMs <= Date.now()) return;
-    setActiveClaim({
-      claimId: waitingClaim.claimId,
-      phoneNumber: waitingClaim.phoneNumber,
-      productName: waitingClaim.productName,
-      productKey: waitingClaim.productKey,
-      expiresAt: expiresMs
-    });
-    setExpiresAt(expiresMs);
-    setTimeLeftMs(expiresMs - Date.now());
-    setClaimState("waiting_otp");
-    const createdMs = new Date(waitingClaim.createdAt).getTime();
-    setClaimStartTime(Number.isNaN(createdMs) ? Date.now() : createdMs);
-  }, [orderDetails, activeClaim]);
+
+    // Update or set active claim from server data (single source of truth)
+    if (!activeClaim || activeClaim.claimId !== waitingClaim.claimId) {
+      setActiveClaim({
+        claimId: waitingClaim.claimId,
+        phoneNumber: waitingClaim.phoneNumber,
+        productName: waitingClaim.productName,
+        productKey: waitingClaim.productKey,
+        expiresAt: expiresMs
+      });
+      setExpiresAt(expiresMs);
+      setTimeLeftMs(expiresMs - Date.now());
+      setClaimState("waiting_otp");
+      const createdMs = new Date(waitingClaim.createdAt).getTime();
+      setClaimStartTime(Number.isNaN(createdMs) ? Date.now() : createdMs);
+    }
+  }, [orderDetails, activeClaim, claimState]);
 
   // Refresh order details after successful claim
   useEffect(() => {

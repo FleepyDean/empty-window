@@ -1,5 +1,6 @@
-import { getNumberCheapest, cancelNumber } from "@/lib/herosms";
+import { getNumberCheapest } from "@/lib/herosms";
 import { prisma } from "@/lib/prisma";
+import { cleanupExpiredClaims } from "@/lib/claim-cleanup";
 import { NextResponse } from "next/server";
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
@@ -157,55 +158,3 @@ export async function POST(request: Request) {
   }
 }
 
-// Helper function to auto-cancel expired claims and restore quantities
-async function cleanupExpiredClaims(orderId: string) {
-  const now = new Date();
-  const expiredClaims = await prisma.claim.findMany({
-    where: {
-      orderId,
-      status: "waiting_otp",
-      expiresAt: { lte: now },
-      quantityDeducted: true
-    }
-  });
-
-  for (const claim of expiredClaims) {
-    try {
-      await prisma.$transaction(async (tx) => {
-        // Restore quantity to OrderItem or Order
-        if (claim.orderItemId) {
-          const orderItem = await tx.orderItem.findUnique({ where: { id: claim.orderItemId } });
-          if (orderItem) {
-            await tx.orderItem.update({
-              where: { id: claim.orderItemId },
-              data: { remainingQty: orderItem.remainingQty + 1 }
-            });
-          }
-        } else {
-          const order = await tx.order.findUnique({ where: { orderId } });
-          if (order) {
-            await tx.order.update({
-              where: { orderId },
-              data: { quantity: order.quantity + 1, status: "active" }
-            });
-          }
-        }
-
-        // Update claim status to expired
-        await tx.claim.update({
-          where: { claimId: claim.claimId },
-          data: { status: "expired", quantityDeducted: false }
-        });
-
-        // Try to cancel the number in HeroSMS (best effort)
-        try {
-          await cancelNumber(claim.heroActivationId);
-        } catch {
-          // Ignore cancellation errors
-        }
-      });
-    } catch {
-      // Continue with next claim if this one fails
-    }
-  }
-}

@@ -3,7 +3,7 @@ const API_KEY = process.env.HEROSMS_API_KEY ?? "";
 const DEFAULT_SERVICE = process.env.HEROSMS_SERVICE ?? "aik";
 const DEFAULT_COUNTRY = process.env.HEROSMS_COUNTRY ?? "7";
 
-type HeroAction = "getNumber" | "getStatus" | "setStatus" | "getBalance" | "getPrices";
+type HeroAction = "getNumber" | "getStatus" | "setStatus" | "getBalance" | "getPrices" | "getPricesVerification";
 
 function assertConfig() {
   if (!API_KEY) throw new Error("HEROSMS_API_KEY is missing");
@@ -24,21 +24,62 @@ async function heroRequest(params: Record<string, string>) {
   return text;
 }
 
+/**
+ * Recursively walk a prices payload and collect every {cost, count} pair where count > 0.
+ * Handles both shapes:
+ *   getPrices:             { country: { service: { cost, count } } }
+ *   getPricesVerification: { country: { service: { operator: { cost, count } } } }
+ */
+function collectAvailableCosts(
+  obj: unknown,
+  serviceFilter: string,
+  inServiceScope = false,
+  out: number[] = []
+): number[] {
+  if (!obj || typeof obj !== "object") return out;
+  // Leaf: { cost, count }
+  const maybe = obj as { cost?: unknown; count?: unknown };
+  if (typeof maybe.cost === "number" && typeof maybe.count === "number") {
+    if (maybe.count > 0 && inServiceScope) out.push(maybe.cost);
+    return out;
+  }
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    const nextScope = inServiceScope || key === serviceFilter;
+    collectAvailableCosts(value, serviceFilter, nextScope, out);
+  }
+  return out;
+}
+
 export async function getMinPrice(service: string, country = DEFAULT_COUNTRY): Promise<number | null> {
+  const candidateCosts: number[] = [];
+
+  // 1) Try getPricesVerification (per-operator pricing — finer granularity)
+  try {
+    const raw = await heroRequest({
+      action: "getPricesVerification" satisfies HeroAction,
+      country,
+      service
+    });
+    try {
+      const parsed = JSON.parse(raw);
+      collectAvailableCosts(parsed, service, false, candidateCosts);
+    } catch {
+      // not JSON — ignore
+    }
+  } catch {
+    // endpoint may not be supported — ignore
+  }
+
+  // 2) Fall back to getPrices (consolidated pricing)
   try {
     const { prices } = await getPrices(service, country);
-    // prices shape: { "<country>": { "<service>": { "cost": X, "count": Y } } }
-    let min: number | null = null;
-    for (const countryData of Object.values(prices) as Record<string, { cost?: number; count?: number }>[]) {
-      const svc = countryData[service];
-      if (svc && typeof svc.cost === "number" && svc.count && svc.count > 0) {
-        if (min === null || svc.cost < min) min = svc.cost;
-      }
-    }
-    return min;
+    collectAvailableCosts(prices, service, false, candidateCosts);
   } catch {
-    return null;
+    // ignore
   }
+
+  if (candidateCosts.length === 0) return null;
+  return Math.min(...candidateCosts);
 }
 
 export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {

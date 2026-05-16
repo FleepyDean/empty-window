@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { PRODUCT_MAP } from "@/lib/products";
+import { cleanupExpiredClaims } from "@/lib/claim-cleanup";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Auto-expire any stuck waiting_otp claims for this order before reading state
+  await cleanupExpiredClaims(trimmedOrderId);
 
   const order = await prisma.order.findUnique({
     where: { orderId: trimmedOrderId },
