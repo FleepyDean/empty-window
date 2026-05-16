@@ -15,10 +15,13 @@ export async function POST(request: Request) {
   }
 
   if (claim.status === "waiting_otp" && claim.expiresAt.getTime() <= Date.now()) {
-    try {
-      await cancelNumber(claim.heroActivationId);
-    } catch {
-      // best-effort cancellation; still expire session locally
+    // For CBTL: if no heroActivationId yet (still in email phase), skip HeroSMS cancel
+    if (claim.heroActivationId) {
+      try {
+        await cancelNumber(claim.heroActivationId);
+      } catch {
+        // best-effort cancellation; still expire session locally
+      }
     }
 
     const expiredClaim = await prisma.claim.update({
@@ -29,6 +32,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       claimId: expiredClaim.claimId,
       phoneNumber: expiredClaim.phoneNumber,
+      emailAddress: expiredClaim.emailAddress,
+      emailOtp: expiredClaim.emailOtp,
       expiresAt: expiredClaim.expiresAt.getTime(),
       status: expiredClaim.status,
       otp: expiredClaim.otp

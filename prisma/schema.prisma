@@ -31,6 +31,12 @@ enum ClaimStatus {
   replaced
 }
 
+enum EmailStatus {
+  available
+  used
+  disabled
+}
+
 model Order {
   id        Int         @id @default(autoincrement())
   orderId   String      @unique
@@ -105,16 +111,34 @@ model Claim {
   order            Order       @relation(fields: [orderId], references: [orderId], onDelete: Restrict, onUpdate: Cascade)
   orderItemId      Int?        // Links to specific OrderItem for cart orders
   orderItem        OrderItem?  @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  phoneNumber      String
-  heroActivationId String      @unique
+  phoneNumber      String?     // Optional: CBTL claims start in email phase, get phone later
+  heroActivationId String?     @unique
   status           ClaimStatus @default(waiting_otp)
   otp              String?
   expiresAt        DateTime
   quantityDeducted Boolean     @default(false)
   operator         String?     // HeroSMS operator used (null = any)
+  // Email OTP fields (used by CBTL)
+  emailAddress     String?     // Assigned dotted Gmail variation
+  emailOtp         String?     // 6-digit OTP fetched from inbox
+  emailFetchedAt   DateTime?
+  emailAccount     EmailAccount?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   @@index([orderId, status])
   @@index([orderItemId])
+}
+
+model EmailAccount {
+  id           Int         @id @default(autoincrement())
+  emailAddress String      @unique // e.g., "r.e.dshocker33@gmail.com"
+  status       EmailStatus @default(available)
+  claimId      String?     @unique
+  claim        Claim?      @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
+  assignedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status])
 }

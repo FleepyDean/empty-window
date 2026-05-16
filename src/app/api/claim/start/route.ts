@@ -1,7 +1,10 @@
 import { getNumberCheapest } from "@/lib/herosms";
 import { prisma } from "@/lib/prisma";
 import { cleanupExpiredClaims } from "@/lib/claim-cleanup";
+import { assignEmailToClaim } from "@/lib/email-pool";
 import { NextResponse } from "next/server";
+
+const CBTL_PRODUCT_KEY = "cbtl";
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 
@@ -33,6 +36,7 @@ export async function POST(request: Request) {
 
   let heroServiceCode: string;
   let productName: string;
+  let productKey: string;
   let canClaim: boolean;
   let targetItemId: number | null = null;
 
@@ -47,6 +51,7 @@ export async function POST(request: Request) {
     }
     heroServiceCode = item.heroServiceCode;
     productName = item.productName;
+    productKey = item.productKey;
     canClaim = item.remainingQty > 0;
     targetItemId = item.id;
   } else if (isCartOrder && !orderItemId) {
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
     }
     heroServiceCode = availableItem.heroServiceCode;
     productName = availableItem.productName;
+    productKey = availableItem.productKey;
     canClaim = true;
     targetItemId = availableItem.id;
   } else {
@@ -72,8 +78,11 @@ export async function POST(request: Request) {
     }
     heroServiceCode = order.heroServiceCode;
     productName = order.productName;
+    productKey = order.productKey;
     canClaim = order.quantity > 0;
   }
+
+  const isEmailFirst = productKey === CBTL_PRODUCT_KEY;
 
   if (!canClaim) {
     return NextResponse.json({ message: "Cannot claim - no remaining quantity." }, { status: 409 });
@@ -93,6 +102,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       claimId: existingActiveClaim.claimId,
       phoneNumber: existingActiveClaim.phoneNumber,
+      emailAddress: existingActiveClaim.emailAddress,
+      emailOtp: existingActiveClaim.emailOtp,
       expiresAt: existingActiveClaim.expiresAt.getTime(),
       productName
     });
@@ -102,13 +113,94 @@ export async function POST(request: Request) {
   await cleanupExpiredClaims(trimmedOrderId);
 
   try {
+    if (isEmailFirst) {
+      // CBTL: email phase first, no HeroSMS yet
+      const newClaimId = buildClaimId();
+
+      // Deduct quantity + create claim shell first (without email yet)
+      await prisma.$transaction(async (tx) => {
+        if (targetItemId) {
+          const orderItem = await tx.orderItem.findUnique({ where: { id: targetItemId } });
+          if (!orderItem || orderItem.remainingQty <= 0) {
+            throw new Error("Product depleted during claim process.");
+          }
+          await tx.orderItem.update({
+            where: { id: targetItemId },
+            data: { remainingQty: orderItem.remainingQty - 1 }
+          });
+        } else {
+          const ord = await tx.order.findUnique({ where: { orderId: trimmedOrderId } });
+          if (!ord || ord.quantity <= 0) {
+            throw new Error("Order depleted during claim process.");
+          }
+          await tx.order.update({
+            where: { orderId: trimmedOrderId },
+            data: { quantity: ord.quantity - 1 }
+          });
+        }
+
+        await tx.claim.create({
+          data: {
+            claimId: newClaimId,
+            orderId: trimmedOrderId,
+            orderItemId: targetItemId,
+            expiresAt: new Date(Date.now() + FIFTEEN_MINUTES_MS),
+            status: "waiting_otp",
+            quantityDeducted: true
+          }
+        });
+      });
+
+      // Reserve an email from the pool. If pool is exhausted, roll back.
+      const emailAddress = await assignEmailToClaim(newClaimId);
+      if (!emailAddress) {
+        // Rollback: restore quantity and delete the claim shell
+        await prisma.$transaction(async (tx) => {
+          await tx.claim.delete({ where: { claimId: newClaimId } }).catch(() => {});
+          if (targetItemId) {
+            const oi = await tx.orderItem.findUnique({ where: { id: targetItemId } });
+            if (oi) {
+              await tx.orderItem.update({
+                where: { id: targetItemId },
+                data: { remainingQty: oi.remainingQty + 1 }
+              });
+            }
+          } else {
+            const ord = await tx.order.findUnique({ where: { orderId: trimmedOrderId } });
+            if (ord) {
+              await tx.order.update({
+                where: { orderId: trimmedOrderId },
+                data: { quantity: ord.quantity + 1 }
+              });
+            }
+          }
+        });
+        return NextResponse.json(
+          { message: "No emails available in the pool. Please contact support." },
+          { status: 503 }
+        );
+      }
+
+      const claim = await prisma.claim.update({
+        where: { claimId: newClaimId },
+        data: { emailAddress }
+      });
+
+      return NextResponse.json({
+        claimId: claim.claimId,
+        phoneNumber: null,
+        emailAddress: claim.emailAddress,
+        emailOtp: null,
+        expiresAt: claim.expiresAt.getTime(),
+        productName
+      });
+    }
+
+    // Default flow (non-CBTL): claim a HeroSMS number immediately
     const heroNumber = await getNumberCheapest(heroServiceCode);
 
-    // Create claim and deduct quantity in a transaction
     const claim = await prisma.$transaction(async (tx) => {
-      // Deduct quantity immediately to prevent double claims
       if (targetItemId) {
-        // Cart order: deduct from OrderItem
         const orderItem = await tx.orderItem.findUnique({ where: { id: targetItemId } });
         if (!orderItem || orderItem.remainingQty <= 0) {
           throw new Error("Product depleted during claim process.");
@@ -118,18 +210,16 @@ export async function POST(request: Request) {
           data: { remainingQty: orderItem.remainingQty - 1 }
         });
       } else {
-        // Legacy single-product order
-        const order = await tx.order.findUnique({ where: { orderId: trimmedOrderId } });
-        if (!order || order.quantity <= 0) {
+        const ord = await tx.order.findUnique({ where: { orderId: trimmedOrderId } });
+        if (!ord || ord.quantity <= 0) {
           throw new Error("Order depleted during claim process.");
         }
         await tx.order.update({
           where: { orderId: trimmedOrderId },
-          data: { quantity: order.quantity - 1 }
+          data: { quantity: ord.quantity - 1 }
         });
       }
 
-      // Create the claim with quantityDeducted = true
       const newClaim = await tx.claim.create({
         data: {
           claimId: buildClaimId(),
@@ -149,6 +239,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       claimId: claim.claimId,
       phoneNumber: claim.phoneNumber,
+      emailAddress: null,
+      emailOtp: null,
       expiresAt: claim.expiresAt.getTime(),
       productName
     });

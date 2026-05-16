@@ -15,10 +15,13 @@ export async function POST(request: Request) {
   }
 
   if (claim.status === "waiting_otp" && claim.expiresAt.getTime() <= Date.now()) {
-    try {
-      await cancelNumber(claim.heroActivationId);
-    } catch {
-      // best-effort cancellation; still expire session locally
+    // For CBTL: if no heroActivationId yet (still in email phase), just expire locally
+    if (claim.heroActivationId) {
+      try {
+        await cancelNumber(claim.heroActivationId);
+      } catch {
+        // best-effort cancellation; still expire session locally
+      }
     }
 
     // Restore quantity and mark as expired
@@ -66,6 +69,15 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: "success",
       otp: claim.otp
+    });
+  }
+
+  // For CBTL: if no heroActivationId yet (still in email phase), cannot poll phone OTP
+  if (!claim.heroActivationId) {
+    return NextResponse.json({
+      status: "waiting_phone",
+      otp: null,
+      message: "Waiting for phone number allocation. Please proceed to phone verification first."
     });
   }
 

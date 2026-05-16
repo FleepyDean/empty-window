@@ -38,16 +38,21 @@ type ClaimHistoryItem = {
   productKey: string;
   productName: string;
   phoneNumber: string;
+  emailAddress: string | null;
+  emailOtp: string | null;
   otp: string | null;
   status: string;
   createdAt: string;
   expiresAt: string;
 };
 
-type ClaimState = "idle" | "claiming" | "waiting_otp" | "success" | "cancelled" | "expired";
+type ClaimPhase = "email" | "phone" | "otp" | null;
+type ClaimState = "idle" | "claiming" | "waiting_email" | "waiting_phone" | "waiting_otp" | "success" | "cancelled" | "expired";
 type ActiveClaim = {
   claimId: string;
   phoneNumber: string;
+  emailAddress: string | null;
+  emailOtp: string | null;
   productName: string;
   productKey: string;
   expiresAt: number;
@@ -74,12 +79,14 @@ function RedeemPageContent() {
   const [activeClaim, setActiveClaim] = useState<ActiveClaim | null>(null);
   const [claimState, setClaimState] = useState<ClaimState>("idle");
   const [otp, setOtp] = useState<string | null>(null);
+  const [emailOtp, setEmailOtp] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [timeLeftMs, setTimeLeftMs] = useState(0);
   const [claimStartTime, setClaimStartTime] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const [claimingProduct, setClaimingProduct] = useState<OrderProduct | null>(null);
   const [revealedLinks, setRevealedLinks] = useState<Set<string>>(new Set());
+  const [waitingForPhone, setWaitingForPhone] = useState(false);
 
   const CANCEL_COOLDOWN_MS = 2 * 60 * 1000;
   const cancelElapsedMs = claimStartTime ? nowMs - claimStartTime : 0;
@@ -145,12 +152,94 @@ function RedeemPageContent() {
     }
   }
 
+  // Poll for email OTP (CBTL specific)
+  useEffect(() => {
+    if (claimState !== "waiting_email" || !activeClaim) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const response = await fetch("/api/claim/email-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ claimId: activeClaim.claimId })
+        });
+        const data = await response.json();
+
+        if (!response.ok) return;
+
+        if (data.status === "success" && data.emailOtp) {
+          setEmailOtp(data.emailOtp);
+          setActiveClaim((prev) => prev ? { ...prev, emailOtp: data.emailOtp } : null);
+          setClaimState("waiting_phone");
+          setWaitingForPhone(false);
+          toast.success("Email OTP received. Proceed to phone verification.");
+          clearInterval(poll);
+          return;
+        }
+
+        if (data.status === "cancelled" || data.status === "expired") {
+          setClaimState(data.status);
+          setActiveClaim(null);
+          setExpiresAt(null);
+          setTimeLeftMs(0);
+          clearActiveClaimId();
+          clearInterval(poll);
+        }
+      } catch {
+        // Fail silently for transient poll errors.
+      }
+    }, OTP_POLL_INTERVAL_MS);
+
+    return () => clearInterval(poll);
+  }, [claimState, activeClaim]);
+
+  // Request phone number for CBTL (after email OTP phase)
+  async function startPhonePhase() {
+    if (!activeClaim || !orderDetails) return;
+
+    setWaitingForPhone(true);
+    try {
+      const response = await fetch("/api/claim/phone-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: orderDetails.orderId,
+          orderItemId: claimingProduct?.itemId,
+          claimId: activeClaim.claimId
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.message ?? "Unable to get phone number.");
+        setWaitingForPhone(false);
+        return;
+      }
+
+      setActiveClaim((prev) => prev ? {
+        ...prev,
+        phoneNumber: data.phoneNumber,
+        expiresAt: data.expiresAt ?? Date.now() + CLAIM_DURATION_MS
+      } : null);
+      setExpiresAt(data.expiresAt ?? Date.now() + CLAIM_DURATION_MS);
+      setTimeLeftMs((data.expiresAt ?? Date.now() + CLAIM_DURATION_MS) - Date.now());
+      setClaimState("waiting_otp");
+      setWaitingForPhone(false);
+      toast.success(`Phone number ${data.phoneNumber} allocated. Waiting for SMS OTP.`);
+    } catch {
+      toast.error("Failed to get phone number. Please retry.");
+      setWaitingForPhone(false);
+    }
+  }
+
   async function startClaim(product: OrderProduct) {
     if (!orderDetails) return;
 
     setClaimingProduct(product);
     setClaimState("claiming");
     setOtp(null);
+    setEmailOtp(null);
+    setWaitingForPhone(false);
 
     try {
       const response = await fetch("/api/claim/start", {
@@ -170,19 +259,34 @@ function RedeemPageContent() {
         return;
       }
 
+      // CBTL: email-first flow
+      const isCbtl = product.productKey === "cbtl";
+
       setActiveClaim({
         claimId: data.claimId,
-        phoneNumber: data.phoneNumber,
+        phoneNumber: data.phoneNumber ?? "",
+        emailAddress: data.emailAddress ?? null,
+        emailOtp: data.emailOtp ?? null,
         productName: product.productName,
         productKey: product.productKey,
         expiresAt: data.expiresAt ?? Date.now() + CLAIM_DURATION_MS
       });
       setExpiresAt(data.expiresAt ?? Date.now() + CLAIM_DURATION_MS);
       setTimeLeftMs((data.expiresAt ?? Date.now() + CLAIM_DURATION_MS) - Date.now());
-      setClaimState("waiting_otp");
+
+      if (isCbtl && data.emailAddress) {
+        // CBTL email phase
+        setClaimState("waiting_email");
+        setEmailOtp(data.emailOtp ?? null);
+        toast.success(`Email ${data.emailAddress} assigned. Check your email for OTP.`);
+      } else {
+        // Standard OTP flow (non-CBTL)
+        setClaimState("waiting_otp");
+        toast.success(`Number claimed for ${product.productName}. Waiting for OTP.`);
+      }
+
       setClaimStartTime(Date.now());
       setActiveClaimId(data.claimId);
-      toast.success(`Number claimed for ${product.productName}. Waiting for OTP.`);
     } catch {
       toast.error("Claim failed. Please retry.");
       setClaimState("idle");
@@ -295,17 +399,26 @@ function RedeemPageContent() {
         }
 
         const data = await response.json();
-        if (data.status === "waiting_otp") {
+        if (data.status === "waiting_otp" || data.status === "waiting_email" || data.status === "waiting_phone") {
           setActiveClaim({
             claimId: data.claimId,
-            phoneNumber: data.phoneNumber,
+            phoneNumber: data.phoneNumber ?? "",
+            emailAddress: data.emailAddress ?? null,
+            emailOtp: data.emailOtp ?? null,
             productName: data.productName || "Product",
             productKey: "unknown",
             expiresAt: data.expiresAt
           });
           setExpiresAt(data.expiresAt);
           setTimeLeftMs(data.expiresAt - Date.now());
-          setClaimState("waiting_otp");
+          setEmailOtp(data.emailOtp ?? null);
+          if (data.status === "waiting_email") {
+            setClaimState("waiting_email");
+          } else if (data.status === "waiting_phone") {
+            setClaimState("waiting_phone");
+          } else {
+            setClaimState("waiting_otp");
+          }
         } else if (data.status === "success") {
           setOtp(data.otp);
           setClaimState("success");
@@ -413,10 +526,13 @@ function RedeemPageContent() {
       setActiveClaim({
         claimId: waitingClaim.claimId,
         phoneNumber: waitingClaim.phoneNumber,
+        emailAddress: waitingClaim.emailAddress ?? null,
+        emailOtp: waitingClaim.emailOtp ?? null,
         productName: waitingClaim.productName,
         productKey: waitingClaim.productKey,
         expiresAt: expiresMs
       });
+      setEmailOtp(waitingClaim.emailOtp ?? null);
       setExpiresAt(expiresMs);
       setTimeLeftMs(expiresMs - Date.now());
       setClaimState("waiting_otp");
@@ -568,14 +684,20 @@ function RedeemPageContent() {
                         </button>
                         <button
                           onClick={() => startClaim(product)}
-                          disabled={!product.canClaim || claimState === "claiming" || claimState === "waiting_otp"}
+                          disabled={!product.canClaim || claimState === "claiming" || claimState === "waiting_email" || claimState === "waiting_phone" || claimState === "waiting_otp"}
                           className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-950 dark:hover:bg-cyan-400"
                         >
                           {claimState === "claiming" && claimingProduct?.productKey === product.productKey
                             ? "Claiming..."
-                            : product.canClaim
-                              ? "Get Number"
-                              : "0 left"}
+                            : claimState === "waiting_email" && claimingProduct?.productKey === product.productKey
+                              ? "Waiting Email..."
+                              : claimState === "waiting_phone" && claimingProduct?.productKey === product.productKey
+                                ? "Waiting Phone..."
+                                : claimState === "waiting_otp" && claimingProduct?.productKey === product.productKey
+                                  ? "Waiting OTP..."
+                                  : product.canClaim
+                                    ? "Get Number"
+                                    : "0 left"}
                         </button>
                       </div>
                     )}
@@ -592,24 +714,118 @@ function RedeemPageContent() {
                       className="border-l-4 border-violet-500 bg-slate-100 p-4 dark:bg-slate-800/50"
                     >
                       <p className="text-xs uppercase tracking-widest text-violet-600 dark:text-violet-400">
-                        {activeClaim.productName} - Claimed Number
+                        {activeClaim.productName} - {claimState === "waiting_email" ? "Email Verification" : claimState === "waiting_phone" ? "Phone Verification" : "Claimed Number"}
                       </p>
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^6/, "")}</p>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber?.replace(/^6/, "") ?? "")}
-                          className="p-2 text-slate-400 transition hover:text-cyan-600"
-                          title="Copy number"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                        </button>
-                      </div>
 
+                      {/* Email Address Display (CBTL) */}
+                      {activeClaim.emailAddress && (
+                        <div className="mt-2">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Email Address:</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">{activeClaim.emailAddress}</p>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(activeClaim.emailAddress ?? "")}
+                              className="p-2 text-slate-400 transition hover:text-cyan-600"
+                              title="Copy email"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Email OTP Display */}
+                      {emailOtp && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="mt-3 border-l-4 border-emerald-500 bg-white p-3 dark:bg-slate-900"
+                        >
+                          <p className="text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Email OTP</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{emailOtp}</p>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(emailOtp)}
+                              className="p-2 text-slate-400 transition hover:text-emerald-600"
+                              title="Copy Email OTP"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Phone Number Display (only when allocated) */}
+                      {activeClaim.phoneNumber && activeClaim.phoneNumber !== "" && (
+                        <div className="mt-2">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Phone Number:</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^6/, "")}</p>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber?.replace(/^6/, "") ?? "")}
+                              className="p-2 text-slate-400 transition hover:text-cyan-600"
+                              title="Copy number"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Email Phase - Waiting for Email OTP */}
+                      {claimState === "waiting_email" && (
+                        <>
+                          <div className="mt-3 flex items-center justify-between gap-3 border-l-2 border-emerald-500 bg-white p-3 dark:bg-slate-900">
+                            <div>
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400">Waiting for Email OTP...</p>
+                              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{countdownLabel}</p>
+                            </div>
+                            <button
+                              onClick={() => cancelClaim("cancelled")}
+                              className="border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-400"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          <div className="mt-2 border-l-2 border-emerald-500 bg-white p-3 dark:bg-slate-900">
+                            <p className="text-xs text-slate-500">• Check your email for the 6-digit OTP from CBTL.</p>
+                            <p className="text-xs text-slate-500">• The OTP will appear automatically once received.</p>
+                            <p className="text-xs text-slate-500">• After receiving the email OTP, you will proceed to phone verification.</p>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Phone Phase - Ready to get phone number */}
+                      {claimState === "waiting_phone" && (
+                        <>
+                          <div className="mt-3 flex items-center justify-between gap-3 border-l-2 border-violet-500 bg-white p-3 dark:bg-slate-900">
+                            <div>
+                              <p className="text-xs text-violet-600 dark:text-violet-400">Email OTP received!</p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">Click below to get your phone number.</p>
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <button
+                              onClick={startPhonePhase}
+                              disabled={waitingForPhone}
+                              className="w-full bg-violet-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-950 dark:hover:bg-violet-400"
+                            >
+                              {waitingForPhone ? "Allocating Phone..." : "Get Phone Number →"}
+                            </button>
+                          </div>
+                          <div className="mt-2 border-l-2 border-violet-500 bg-white p-3 dark:bg-slate-900">
+                            <p className="text-xs text-slate-500">• Click the button above to allocate a phone number.</p>
+                            <p className="text-xs text-slate-500">• SMS OTP will be polled automatically once the number is ready.</p>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Standard OTP Phase */}
                       {claimState === "waiting_otp" && (
                         <>
                           <div className="mt-3 flex items-center justify-between gap-3 border-l-2 border-amber-500 bg-white p-3 dark:bg-slate-900">
                             <div>
-                              <p className="text-xs text-amber-600 dark:text-amber-400">Waiting for OTP...</p>
+                              <p className="text-xs text-amber-600 dark:text-amber-400">Waiting for SMS OTP...</p>
                               <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{countdownLabel}</p>
                             </div>
                             <button

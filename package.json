@@ -8,11 +8,14 @@
     "start": "prisma db push --accept-data-loss && next start",
     "lint": "next lint",
     "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.mjs"
+    "prisma:generate": "prisma generate",
+    "db:seed": "node prisma/seed.mjs",
+    "emails:import": "node scripts/import-emails.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "framer-motion": "^11.11.17",
+    "imapflow": "^1.0.196",
     "next": "^15.0.3",
     "prisma": "^6.19.3",
     "react": "^18.3.1",

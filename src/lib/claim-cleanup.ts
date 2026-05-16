@@ -49,10 +49,13 @@ export async function cleanupExpiredClaims(orderId?: string): Promise<number> {
       });
 
       // Best-effort HeroSMS cancel — outside the transaction
-      try {
-        await cancelNumber(claim.heroActivationId);
-      } catch {
-        // ignore
+      // For CBTL: if no heroActivationId yet (still in email phase), skip HeroSMS cancel
+      if (claim.heroActivationId) {
+        try {
+          await cancelNumber(claim.heroActivationId);
+        } catch {
+          // ignore
+        }
       }
 
       cleaned++;

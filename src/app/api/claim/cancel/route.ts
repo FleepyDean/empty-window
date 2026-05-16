@@ -22,15 +22,18 @@ export async function POST(request: Request) {
   }
 
   if (claim.status === "waiting_otp") {
-    try {
-      await cancelNumber(claim.heroActivationId);
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : "";
-      const isEarlyCancel = raw.includes("EARLY_CANCEL");
-      const message = isEarlyCancel
-        ? "You can only cancel after 2 minutes. Please wait and try again."
-        : "Cancellation failed. Please try again.";
-      return NextResponse.json({ message }, { status: isEarlyCancel ? 409 : 502 });
+    // For CBTL: if no heroActivationId yet (still in email phase), skip HeroSMS cancel
+    if (claim.heroActivationId) {
+      try {
+        await cancelNumber(claim.heroActivationId);
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : "";
+        const isEarlyCancel = raw.includes("EARLY_CANCEL");
+        const message = isEarlyCancel
+          ? "You can only cancel after 2 minutes. Please wait and try again."
+          : "Cancellation failed. Please try again.";
+        return NextResponse.json({ message }, { status: isEarlyCancel ? 409 : 502 });
+      }
     }
   }
 
