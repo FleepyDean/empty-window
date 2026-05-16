@@ -37,8 +37,20 @@ export async function POST(request: Request) {
     }
   }
 
-  // Restore quantity if it was deducted
+  // Restore quantity if it was deducted, and release email if assigned
   const nextState = await prisma.$transaction(async (tx) => {
+    // Release email back to pool if assigned
+    if (claim.emailAccountId) {
+      await tx.emailAccount.update({
+        where: { id: claim.emailAccountId },
+        data: {
+          status: "available",
+          claimId: null,
+          assignedAt: null
+        }
+      });
+    }
+
     if (claim.quantityDeducted) {
       if (claim.orderItemId) {
         const orderItem = await tx.orderItem.findUnique({ where: { id: claim.orderItemId } });
@@ -61,7 +73,13 @@ export async function POST(request: Request) {
 
     return await tx.claim.update({
       where: { claimId },
-      data: { status: reason === "expired" ? "expired" : "cancelled", quantityDeducted: false }
+      data: {
+        status: reason === "expired" ? "expired" : "cancelled",
+        quantityDeducted: false,
+        emailAccountId: null,
+        emailAddress: null,
+        emailOtp: null
+      }
     });
   });
 
