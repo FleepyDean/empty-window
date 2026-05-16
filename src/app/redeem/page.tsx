@@ -613,12 +613,16 @@ function RedeemPageContent() {
                               <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{countdownLabel}</p>
                             </div>
                             <button
-                              onClick={() => cancelClaim("cancelled")}
-                              disabled={withinCooldown}
-                              className="border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
-                              title={withinCooldown ? `Available in ${cancelCooldownLabel}` : "Cancel claim"}
+                              onClick={() => {
+                                if (withinCooldown) {
+                                  toast.message("You can only cancel after 2 minutes.");
+                                  return;
+                                }
+                                cancelClaim("cancelled");
+                              }}
+                              className="border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-400"
                             >
-                              {withinCooldown ? `Cancel (${cancelCooldownLabel})` : "Cancel"}
+                              Cancel
                             </button>
                           </div>
                           <div className="mt-2 border-l-2 border-amber-500 bg-white p-3 dark:bg-slate-900">
