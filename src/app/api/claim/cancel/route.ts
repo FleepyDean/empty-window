@@ -39,10 +39,11 @@ export async function POST(request: Request) {
 
   // Restore quantity if it was deducted, and release email if assigned
   const nextState = await prisma.$transaction(async (tx) => {
-    // Release email back to pool if assigned
-    if (claim.emailAccountId) {
+    // Release email back to pool if assigned (look up by claimId)
+    const emailAccount = await tx.emailAccount.findFirst({ where: { claimId } });
+    if (emailAccount) {
       await tx.emailAccount.update({
-        where: { id: claim.emailAccountId },
+        where: { id: emailAccount.id },
         data: {
           status: "available",
           claimId: null,
@@ -76,7 +77,6 @@ export async function POST(request: Request) {
       data: {
         status: reason === "expired" ? "expired" : "cancelled",
         quantityDeducted: false,
-        emailAccountId: null,
         emailAddress: null,
         emailOtp: null
       }
