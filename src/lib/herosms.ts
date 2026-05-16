@@ -111,7 +111,34 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {
 
 export async function getNumberCheapest(service = DEFAULT_SERVICE) {
   const minPrice = await getMinPrice(service);
-  return getNumber(service, minPrice ?? undefined);
+
+  // If we couldn't determine a price, fall back to a plain getNumber.
+  if (minPrice === null || minPrice <= 0) {
+    return getNumber(service);
+  }
+
+  // Probe a ladder of maxPrice values from low to high. HeroSMS allocates from the
+  // cheapest pool at-or-below maxPrice, so if a cheaper tier exists (e.g. $0.0704
+  // when getPrices reports $0.0737 as the consolidated min), the lower probe wins.
+  // Each rung that returns NO_NUMBERS gracefully falls through to the next.
+  const ratios = [0.7, 0.85, 0.95, 1.0, 1.15];
+  let lastError: unknown = null;
+  for (const r of ratios) {
+    const candidate = Math.round(minPrice * r * 10000) / 10000; // 4 decimal places
+    try {
+      return await getNumber(service, candidate);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      lastError = err;
+      // Only continue the ladder when there are no numbers at this price tier
+      if (!/NO_NUMBERS|NO_FREE_NUMBERS|NO_NUMBER/i.test(message)) {
+        throw err;
+      }
+    }
+  }
+
+  // All probes exhausted — surface the last error
+  throw lastError instanceof Error ? lastError : new Error("HeroSMS: no numbers available across all price tiers");
 }
 
 export async function getOtp(activationId: string) {
