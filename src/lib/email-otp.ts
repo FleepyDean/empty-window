@@ -91,7 +91,7 @@ export async function fetchCbtlOtpForEmail(
         if (otp) {
           return {
             otp,
-            receivedAt: msg.internalDate ?? new Date()
+            receivedAt: msg.internalDate ? new Date(msg.internalDate) : new Date()
           };
         }
       }
