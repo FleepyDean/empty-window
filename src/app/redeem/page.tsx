@@ -326,8 +326,9 @@ function RedeemPageContent() {
     }
   }, [activeClaim]);
 
+  // Countdown timer for both email and OTP waiting phases
   useEffect(() => {
-    if (claimState !== "waiting_otp" || !activeClaim || !expiresAt) return;
+    if ((claimState !== "waiting_otp" && claimState !== "waiting_email") || !activeClaim || !expiresAt) return;
 
     const interval = setInterval(() => {
       const nextLeft = expiresAt - Date.now();
