@@ -6,7 +6,8 @@ const IMAP_USER = process.env.GMAIL_BASE_EMAIL ?? "";
 const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 
 // CBTL OTP email signature
-const CBTL_FROM_DOMAIN = "thecoffeebeanandtealeaf.com";
+// The actual sender is cmo-noreply@mycoffeebeanandtealeaf.com (MyCBTL)
+const CBTL_FROM_DOMAIN = "mycoffeebeanandtealeaf.com";
 const CBTL_SUBJECT_CONTAINS = "OTP";  // Broader match
 
 export type EmailOtpResult = {
@@ -112,6 +113,9 @@ export async function fetchCbtlOtpForEmail(
 
         // Extract OTP — first 6-digit run in body, ignoring alphanumeric
         const body = msg.source ? msg.source.toString("utf8") : "";
+        // Log first 500 chars of body for debugging
+        const bodyPreview = body.substring(0, 500).replace(/\n/g, " ");
+        console.log(`[IMAP] Body preview: ${bodyPreview}...`);
         const otp = extractSixDigitOtp(body);
         console.log(`[IMAP] OTP extraction result: ${otp ?? "null"}`);
 
@@ -140,13 +144,27 @@ export async function fetchCbtlOtpForEmail(
  * CBTL emails contain:
  *   - the OTP as a standalone 6-digit number (e.g. 292762)
  *   - an alphanumeric reference like "F89B45" — IGNORE this
- * Strategy: find all standalone 6-digit numeric runs (not adjacent to
- * letters/digits) and pick the first one.
+ * Strategy: find all standalone 6-digit numeric runs and pick the first one.
+ * Handles HTML emails by stripping tags first.
  */
 export function extractSixDigitOtp(body: string): string | null {
   if (!body) return null;
-  // Match exactly 6 digits with non-alphanumeric (or boundary) on both sides
-  const matches = body.match(/(?<![A-Za-z0-9])\d{6}(?![A-Za-z0-9])/g);
-  if (!matches || matches.length === 0) return null;
-  return matches[0];
+
+  // Remove HTML tags for HTML emails
+  const textOnly = body.replace(/<[^>]+>/g, " ");
+
+  // First try: look for 6 digits that are not adjacent to other digits or letters
+  // This avoids matching parts of longer numbers or alphanumeric codes
+  const strictMatches = textOnly.match(/(?<![A-Za-z0-9])\d{6}(?![A-Za-z0-9])/g);
+  if (strictMatches && strictMatches.length > 0) {
+    return strictMatches[0];
+  }
+
+  // Second try: look for any 6 consecutive digits (more lenient)
+  const lenientMatches = textOnly.match(/\d{6}/g);
+  if (lenientMatches && lenientMatches.length > 0) {
+    return lenientMatches[0];
+  }
+
+  return null;
 }
