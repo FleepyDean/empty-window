@@ -167,12 +167,15 @@ function RedeemPageContent() {
 
         if (!response.ok) return;
 
-        if ((data.status === "email_otp_ready" || data.status === "success") && data.emailOtp) {
+        if (data.status === "success" && data.emailOtp) {
           setEmailOtp(data.emailOtp);
+          setOtp(data.emailOtp);  // Use email OTP as final OTP
           setActiveClaim((prev) => prev ? { ...prev, emailOtp: data.emailOtp } : null);
-          setClaimState("waiting_phone");
-          setWaitingForPhone(false);
-          toast.success("Email OTP received. Proceed to phone verification.");
+          setClaimState("success");
+          setTimeLeftMs(0);
+          setExpiresAt(null);
+          clearActiveClaimId();
+          toast.success("Email OTP received! Order complete.");
           clearInterval(poll);
           return;
         }
@@ -399,7 +402,7 @@ function RedeemPageContent() {
         }
 
         const data = await response.json();
-        if (data.status === "waiting_otp" || data.status === "waiting_email" || data.status === "waiting_phone") {
+        if (data.status === "waiting_otp" || data.status === "waiting_email") {
           setActiveClaim({
             claimId: data.claimId,
             phoneNumber: data.phoneNumber ?? "",
@@ -414,8 +417,6 @@ function RedeemPageContent() {
           setEmailOtp(data.emailOtp ?? null);
           if (data.status === "waiting_email") {
             setClaimState("waiting_email");
-          } else if (data.status === "waiting_phone") {
-            setClaimState("waiting_phone");
           } else {
             setClaimState("waiting_otp");
           }
@@ -684,20 +685,18 @@ function RedeemPageContent() {
                         </button>
                         <button
                           onClick={() => startClaim(product)}
-                          disabled={!product.canClaim || claimState === "claiming" || claimState === "waiting_email" || claimState === "waiting_phone" || claimState === "waiting_otp"}
+                          disabled={!product.canClaim || claimState === "claiming" || claimState === "waiting_email" || claimState === "waiting_otp"}
                           className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-950 dark:hover:bg-cyan-400"
                         >
                           {claimState === "claiming" && claimingProduct?.productKey === product.productKey
                             ? "Claiming..."
                             : claimState === "waiting_email" && claimingProduct?.productKey === product.productKey
                               ? "Waiting Email..."
-                              : claimState === "waiting_phone" && claimingProduct?.productKey === product.productKey
-                                ? "Waiting Phone..."
-                                : claimState === "waiting_otp" && claimingProduct?.productKey === product.productKey
-                                  ? "Waiting OTP..."
-                                  : product.canClaim
-                                    ? "Get Number"
-                                    : "0 left"}
+                              : claimState === "waiting_otp" && claimingProduct?.productKey === product.productKey
+                                ? "Waiting OTP..."
+                                : product.canClaim
+                                  ? "Get Number"
+                                  : "0 left"}
                         </button>
                       </div>
                     )}
@@ -714,7 +713,7 @@ function RedeemPageContent() {
                       className="border-l-4 border-violet-500 bg-slate-100 p-4 dark:bg-slate-800/50"
                     >
                       <p className="text-xs uppercase tracking-widest text-violet-600 dark:text-violet-400">
-                        {activeClaim.productName} - {claimState === "waiting_email" ? "Email Verification" : claimState === "waiting_phone" ? "Phone Verification" : "Claimed Number"}
+                        {activeClaim.productName} - {claimState === "waiting_email" ? "Email Verification" : claimState === "success" ? "Complete" : "Claimed"}
                       </p>
 
                       {/* Email Address Display (CBTL) */}
@@ -790,35 +789,11 @@ function RedeemPageContent() {
                           <div className="mt-2 border-l-2 border-emerald-500 bg-white p-3 dark:bg-slate-900">
                             <p className="text-xs text-slate-500">• Check your email for the 6-digit OTP from CBTL.</p>
                             <p className="text-xs text-slate-500">• The OTP will appear automatically once received.</p>
-                            <p className="text-xs text-slate-500">• After receiving the email OTP, you will proceed to phone verification.</p>
+                            <p className="text-xs text-slate-500">• Once confirmed, your order is complete!</p>
                           </div>
                         </>
                       )}
 
-                      {/* Phone Phase - Ready to get phone number */}
-                      {claimState === "waiting_phone" && (
-                        <>
-                          <div className="mt-3 flex items-center justify-between gap-3 border-l-2 border-violet-500 bg-white p-3 dark:bg-slate-900">
-                            <div>
-                              <p className="text-xs text-violet-600 dark:text-violet-400">Email OTP received!</p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">Click below to get your phone number.</p>
-                            </div>
-                          </div>
-                          <div className="mt-3">
-                            <button
-                              onClick={startPhonePhase}
-                              disabled={waitingForPhone}
-                              className="w-full bg-violet-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-950 dark:hover:bg-violet-400"
-                            >
-                              {waitingForPhone ? "Allocating Phone..." : "Get Phone Number →"}
-                            </button>
-                          </div>
-                          <div className="mt-2 border-l-2 border-violet-500 bg-white p-3 dark:bg-slate-900">
-                            <p className="text-xs text-slate-500">• Click the button above to allocate a phone number.</p>
-                            <p className="text-xs text-slate-500">• SMS OTP will be polled automatically once the number is ready.</p>
-                          </div>
-                        </>
-                      )}
 
                       {/* Standard OTP Phase */}
                       {claimState === "waiting_otp" && (

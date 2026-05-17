@@ -22,7 +22,7 @@ function assertConfig() {
 
 /**
  * Search the configured Gmail inbox for the most recent CBTL OTP email
- * delivered to the given dotted-variation address since `since`.
+ * delivered to the given dotted-variation address.
  *
  * Returns the 6-digit OTP if found, or null if not yet received.
  *
@@ -37,6 +37,9 @@ export async function fetchCbtlOtpForEmail(
 ): Promise<EmailOtpResult | null> {
   assertConfig();
 
+  // Log for debugging (these appear in Railway logs)
+  console.log(`[IMAP] Searching for OTP email to: ${toEmail}, since: ${since.toISOString()}`);
+
   const client = new ImapFlow({
     host: IMAP_HOST,
     port: IMAP_PORT,
@@ -46,23 +49,34 @@ export async function fetchCbtlOtpForEmail(
   });
 
   await client.connect();
+  console.log(`[IMAP] Connected to ${IMAP_HOST}`);
+
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
-      // Search by Subject + Since. We post-filter by To/From to be tolerant
-      // of how IMAP servers handle plus/dot addressing in TO searches.
+      // Use a broader search: look at emails from last 24 hours to handle timezone issues
+      // IMAP SINCE is date-only, so we search recent emails and filter by envelope
+      const searchSince = new Date(since);
+      searchSince.setHours(searchSince.getHours() - 24); // Go back 24 hours to be safe
+
+      console.log(`[IMAP] Searching with subject "${CBTL_SUBJECT}" since ${searchSince.toISOString()}`);
+
+      // Search by Subject + Since (broader time window)
       const uids = await client.search(
         {
           subject: CBTL_SUBJECT,
-          since
+          since: searchSince
         },
         { uid: true }
       );
 
-      if (!uids || uids.length === 0) return null;
+      const uidArray = Array.isArray(uids) ? uids : [];
+      console.log(`[IMAP] Found ${uidArray.length} emails with subject "${CBTL_SUBJECT}"`);
+
+      if (uidArray.length === 0) return null;
 
       // Walk newest → oldest
-      const sorted = [...uids].sort((a, b) => b - a);
+      const sorted = [...uidArray].sort((a, b) => b - a);
       const targetTo = toEmail.toLowerCase().trim();
 
       for (const uid of sorted) {
@@ -76,19 +90,32 @@ export async function fetchCbtlOtpForEmail(
         const env = msg.envelope;
         if (!env) continue;
 
-        // From must be CBTL
         const fromAddr = env.from?.[0]?.address?.toLowerCase() ?? "";
-        if (!fromAddr.includes(CBTL_FROM_DOMAIN)) continue;
+        const toAddrs = (env.to ?? []).map((a: { address?: string }) => (a.address ?? "").toLowerCase());
+        const subject = env.subject ?? "";
+        const internalDate = msg.internalDate;
+
+        console.log(`[IMAP] Checking email: from=${fromAddr}, to=${toAddrs.join(", ")}, subject="${subject}", date=${internalDate}`);
+
+        // From must be CBTL
+        if (!fromAddr.includes(CBTL_FROM_DOMAIN)) {
+          console.log(`[IMAP] Skipping: from address doesn't match ${CBTL_FROM_DOMAIN}`);
+          continue;
+        }
 
         // To must match the exact dotted variation we assigned
-        const toAddrs = (env.to ?? []).map((a: { address?: string }) => (a.address ?? "").toLowerCase());
-        if (!toAddrs.includes(targetTo)) continue;
+        if (!toAddrs.includes(targetTo)) {
+          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo}`);
+          continue;
+        }
 
         // Extract OTP — first 6-digit run in body, ignoring alphanumeric
-        // reference codes like "F89B45" which are mixed-case hex.
         const body = msg.source ? msg.source.toString("utf8") : "";
         const otp = extractSixDigitOtp(body);
+        console.log(`[IMAP] OTP extraction result: ${otp ?? "null"}`);
+
         if (otp) {
+          console.log(`[IMAP] SUCCESS! Found OTP: ${otp}`);
           return {
             otp,
             receivedAt: msg.internalDate ? new Date(msg.internalDate) : new Date()
@@ -96,12 +123,14 @@ export async function fetchCbtlOtpForEmail(
         }
       }
 
+      console.log(`[IMAP] No matching OTP found in ${uidArray.length} emails`);
       return null;
     } finally {
       lock.release();
     }
   } finally {
     await client.logout().catch(() => {});
+    console.log(`[IMAP] Disconnected`);
   }
 }
 

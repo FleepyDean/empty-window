@@ -66,15 +66,22 @@ export async function POST(request: Request) {
     });
   }
 
-  // Persist the OTP on the claim
+  // For CBTL: mark as success after email OTP (no phone phase)
   const updated = await prisma.claim.update({
     where: { claimId },
-    data: { emailOtp: result.otp, emailFetchedAt: result.receivedAt }
+    data: {
+      emailOtp: result.otp,
+      emailFetchedAt: result.receivedAt,
+      status: "success",
+      otp: result.otp,  // Use email OTP as the final OTP
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // Extend validity for display
+    }
   });
 
   return NextResponse.json({
-    status: "email_otp_ready",
+    status: "success",
     emailAddress: updated.emailAddress,
-    emailOtp: updated.emailOtp
+    emailOtp: updated.emailOtp,
+    otp: updated.otp
   });
 }
