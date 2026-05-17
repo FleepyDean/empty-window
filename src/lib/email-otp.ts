@@ -13,6 +13,7 @@ const CBTL_SUBJECT_CONTAINS = "OTP";  // Broader match
 export type EmailOtpResult = {
   otp: string;
   receivedAt: Date;
+  messageId: string;
 };
 
 function assertConfig() {
@@ -35,7 +36,8 @@ function assertConfig() {
 export async function fetchCbtlOtpForEmail(
   toEmail: string,
   since: Date,
-  excludeOtps: string[] = []
+  excludeOtps: string[] = [],
+  excludeMessageIds: string[] = []
 ): Promise<EmailOtpResult | null> {
   assertConfig();
 
@@ -109,7 +111,14 @@ export async function fetchCbtlOtpForEmail(
         const fromAddr = env.from?.[0]?.address?.toLowerCase() ?? "";
         const toAddrs = (env.to ?? []).map((a: { address?: string }) => (a.address ?? "").toLowerCase());
         const subject = env.subject ?? "";
+        const messageId = env.messageId ?? String(uid);
         const internalDate = msg.internalDate;
+
+        // Skip if this exact email was already used by another claim
+        if (excludeMessageIds.includes(messageId)) {
+          console.log(`[IMAP] Skipping: messageId ${messageId} already used by another claim`);
+          continue;
+        }
 
         console.log(`[IMAP] Checking email: from=${fromAddr}, to=${toAddrs.join(", ")}, subject="${subject}", date=${internalDate}`);
 
@@ -148,10 +157,11 @@ export async function fetchCbtlOtpForEmail(
             console.log(`[IMAP] Skipping: OTP ${otp} is in excludeOtps list (already used)`);
             continue;
           }
-          console.log(`[IMAP] SUCCESS! Found OTP: ${otp}`);
+          console.log(`[IMAP] SUCCESS! Found OTP: ${otp}, messageId: ${messageId}`);
           return {
             otp,
-            receivedAt: msg.internalDate ? new Date(msg.internalDate) : new Date()
+            receivedAt: msg.internalDate ? new Date(msg.internalDate) : new Date(),
+            messageId
           };
         }
       }

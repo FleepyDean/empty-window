@@ -121,6 +121,7 @@ model Claim {
   // Email OTP fields (used by CBTL)
   emailAddress     String?     // Assigned dotted Gmail variation
   emailOtp         String?     // 6-digit OTP fetched from inbox
+  emailMessageId   String?     // IMAP Message-ID of the email used (prevents reuse)
   emailFetchedAt   DateTime?
   emailAccount     EmailAccount?
   createdAt        DateTime    @default(now())

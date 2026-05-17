@@ -49,18 +49,19 @@ export async function POST(request: Request) {
     });
   }
 
-  // Gather all OTPs already used by other claims so we skip them in IMAP
-  const usedOtpRecords = await prisma.claim.findMany({
+  // Gather all OTPs and Message-IDs already used by other claims
+  const usedRecords = await prisma.claim.findMany({
     where: { emailOtp: { not: null }, claimId: { not: claimId } },
-    select: { emailOtp: true }
+    select: { emailOtp: true, emailMessageId: true }
   });
-  const excludeOtps = usedOtpRecords.map((r) => r.emailOtp as string);
-  console.log(`[IMAP] Excluding ${excludeOtps.length} already-used OTPs: ${excludeOtps.join(", ")}`);
+  const excludeOtps = usedRecords.map((r) => r.emailOtp as string);
+  const excludeMessageIds = usedRecords.map((r) => r.emailMessageId).filter(Boolean) as string[];
+  console.log(`[IMAP] Excluding ${excludeOtps.length} used OTPs, ${excludeMessageIds.length} used messageIds`);
 
   // Poll inbox — search since claim creation
   let result;
   try {
-    result = await fetchCbtlOtpForEmail(claim.emailAddress, claim.createdAt, excludeOtps);
+    result = await fetchCbtlOtpForEmail(claim.emailAddress, claim.createdAt, excludeOtps, excludeMessageIds);
   } catch (err) {
     const message = err instanceof Error ? err.message : "IMAP error";
     const stack = err instanceof Error ? err.stack : "";
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
     where: { claimId },
     data: {
       emailOtp: result.otp,
+      emailMessageId: result.messageId,
       emailFetchedAt: result.receivedAt,
       status: "success",
       otp: result.otp,  // Use email OTP as the final OTP
