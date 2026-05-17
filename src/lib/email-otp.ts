@@ -88,6 +88,13 @@ export async function fetchCbtlOtpForEmail(
       // Walk newest → oldest
       const sorted = [...uidArray].sort((a, b) => b - a);
       const targetTo = toEmail.toLowerCase().trim();
+      // Canonical form strips dots from local part (Gmail ignores dots)
+      const canonicalize = (addr: string) => {
+        const [local, domain] = addr.split("@");
+        return `${(local ?? "").replace(/\./g, "")}@${domain ?? ""}`;
+      };
+      const targetCanonical = canonicalize(targetTo);
+      console.log(`[IMAP] Target to: ${targetTo} (canonical: ${targetCanonical})`);
 
       for (const uid of sorted) {
         const msg = await client.fetchOne(
@@ -113,9 +120,12 @@ export async function fetchCbtlOtpForEmail(
           continue;
         }
 
-        // To must match the exact dotted variation we assigned
-        if (!toAddrs.includes(targetTo)) {
-          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo}`);
+        // To must match — first try exact, then canonical (dot-stripped) comparison
+        const toCanonicals = toAddrs.map(canonicalize);
+        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")} (canonicals: ${toCanonicals.join(", ")})`);
+        const toMatches = toAddrs.includes(targetTo) || toCanonicals.includes(targetCanonical);
+        if (!toMatches) {
+          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo} or ${targetCanonical}`);
           continue;
         }
 
