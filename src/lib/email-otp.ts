@@ -6,8 +6,8 @@ const IMAP_USER = process.env.GMAIL_BASE_EMAIL ?? "";
 const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 
 // CBTL OTP email signature
-// The actual sender is cmo-noreply@mycoffeebeanandtealeaf.com (MyCBTL)
-const CBTL_FROM_DOMAIN = "my.coffeebeanandtealeaf.com";
+// The actual sender is no-reply@my.thecoffeebeanandtealeaf.com (MyCBTL)
+const CBTL_FROM_DOMAIN = "my.thecoffeebeanandtealeaf.com";
 const CBTL_SUBJECT_CONTAINS = "OTP";  // Broader match
 
 export type EmailOtpResult = {
