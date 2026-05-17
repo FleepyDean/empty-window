@@ -69,6 +69,22 @@ export async function POST(request: Request) {
     });
   }
 
+  // Reject this OTP if it was already used by a different claim
+  const alreadyUsed = await prisma.claim.findFirst({
+    where: {
+      emailOtp: result.otp,
+      claimId: { not: claimId }
+    }
+  });
+  if (alreadyUsed) {
+    console.log(`[IMAP] OTP ${result.otp} already used by claim ${alreadyUsed.claimId}, skipping`);
+    return NextResponse.json({
+      status: "waiting_email_otp",
+      emailAddress: claim.emailAddress,
+      emailOtp: null
+    });
+  }
+
   // For CBTL: mark as success after email OTP (no phone phase)
   const updated = await prisma.claim.update({
     where: { claimId },
