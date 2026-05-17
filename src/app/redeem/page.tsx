@@ -167,7 +167,7 @@ function RedeemPageContent() {
 
         if (!response.ok) return;
 
-        if (data.status === "success" && data.emailOtp) {
+        if ((data.status === "email_otp_ready" || data.status === "success") && data.emailOtp) {
           setEmailOtp(data.emailOtp);
           setActiveClaim((prev) => prev ? { ...prev, emailOtp: data.emailOtp } : null);
           setClaimState("waiting_phone");
