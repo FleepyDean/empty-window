@@ -49,10 +49,18 @@ export async function POST(request: Request) {
     });
   }
 
+  // Gather all OTPs already used by other claims so we skip them in IMAP
+  const usedOtpRecords = await prisma.claim.findMany({
+    where: { emailOtp: { not: null }, claimId: { not: claimId } },
+    select: { emailOtp: true }
+  });
+  const excludeOtps = usedOtpRecords.map((r) => r.emailOtp as string);
+  console.log(`[IMAP] Excluding ${excludeOtps.length} already-used OTPs: ${excludeOtps.join(", ")}`);
+
   // Poll inbox — search since claim creation
   let result;
   try {
-    result = await fetchCbtlOtpForEmail(claim.emailAddress, claim.createdAt);
+    result = await fetchCbtlOtpForEmail(claim.emailAddress, claim.createdAt, excludeOtps);
   } catch (err) {
     const message = err instanceof Error ? err.message : "IMAP error";
     const stack = err instanceof Error ? err.stack : "";
@@ -62,22 +70,6 @@ export async function POST(request: Request) {
   }
 
   if (!result) {
-    return NextResponse.json({
-      status: "waiting_email_otp",
-      emailAddress: claim.emailAddress,
-      emailOtp: null
-    });
-  }
-
-  // Reject this OTP if it was already used by a different claim
-  const alreadyUsed = await prisma.claim.findFirst({
-    where: {
-      emailOtp: result.otp,
-      claimId: { not: claimId }
-    }
-  });
-  if (alreadyUsed) {
-    console.log(`[IMAP] OTP ${result.otp} already used by claim ${alreadyUsed.claimId}, skipping`);
     return NextResponse.json({
       status: "waiting_email_otp",
       emailAddress: claim.emailAddress,

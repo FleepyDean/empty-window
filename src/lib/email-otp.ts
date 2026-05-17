@@ -34,7 +34,8 @@ function assertConfig() {
  */
 export async function fetchCbtlOtpForEmail(
   toEmail: string,
-  since: Date
+  since: Date,
+  excludeOtps: string[] = []
 ): Promise<EmailOtpResult | null> {
   assertConfig();
 
@@ -143,6 +144,10 @@ export async function fetchCbtlOtpForEmail(
         console.log(`[IMAP] OTP extraction result: ${otp ?? "null"}`);
 
         if (otp) {
+          if (excludeOtps.includes(otp)) {
+            console.log(`[IMAP] Skipping: OTP ${otp} is in excludeOtps list (already used)`);
+            continue;
+          }
           console.log(`[IMAP] SUCCESS! Found OTP: ${otp}`);
           return {
             otp,
