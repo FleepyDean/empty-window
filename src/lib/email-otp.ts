@@ -1,4 +1,5 @@
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 
 const IMAP_HOST = process.env.GMAIL_IMAP_HOST ?? "imap.gmail.com";
 const IMAP_PORT = Number(process.env.GMAIL_IMAP_PORT ?? 993);
@@ -6,9 +7,12 @@ const IMAP_USER = process.env.GMAIL_BASE_EMAIL ?? "";
 const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 
 // CBTL OTP email signature
-// The actual sender is no-reply@my.thecoffeebeanandtealeaf.com (MyCBTL)
+// We ONLY accept OTP emails from no-reply@... (skip marketing@...)
+const CBTL_FROM_EXACT = "no-reply@my.thecoffeebeanandtealeaf.com";
 const CBTL_FROM_DOMAIN = "my.thecoffeebeanandtealeaf.com";
 const CBTL_SUBJECT_CONTAINS = "OTP";  // Broader match
+// Marker text that appears in CBTL OTP emails, right before the 6-digit code
+const OTP_MARKER = "thanks for joining MyCBTL";
 
 export type EmailOtpResult = {
   otp: string;
@@ -75,7 +79,7 @@ export async function fetchCbtlOtpForEmail(
 
       const uids = await client.search(
         {
-          from: CBTL_FROM_DOMAIN,
+          from: CBTL_FROM_EXACT,
           since: searchSince
         },
         { uid: true }
@@ -122,6 +126,12 @@ export async function fetchCbtlOtpForEmail(
 
         console.log(`[IMAP] Checking email: from=${fromAddr}, to=${toAddrs.join(", ")}, subject="${subject}", date=${internalDate}`);
 
+        // Only accept emails from the exact no-reply sender (skip marketing@...)
+        if (fromAddr !== CBTL_FROM_EXACT) {
+          console.log(`[IMAP] Skipping: from address "${fromAddr}" is not ${CBTL_FROM_EXACT}`);
+          continue;
+        }
+
         // Strictly reject emails received BEFORE this claim was created
         const emailDate = msg.internalDate ? new Date(msg.internalDate) : null;
         if (!emailDate || emailDate < since) {
@@ -144,12 +154,20 @@ export async function fetchCbtlOtpForEmail(
           continue;
         }
 
-        // Extract OTP — first 6-digit run in body, ignoring alphanumeric
-        const body = msg.source ? msg.source.toString("utf8") : "";
-        // Log first 500 chars of body for debugging
-        const bodyPreview = body.substring(0, 500).replace(/\n/g, " ");
-        console.log(`[IMAP] Body preview: ${bodyPreview}...`);
-        const otp = extractSixDigitOtp(body);
+        // Parse email properly (decode quoted-printable / base64 / HTML)
+        if (!msg.source) {
+          console.log(`[IMAP] Skipping: no source for uid ${uid}`);
+          continue;
+        }
+        const parsed = await simpleParser(msg.source);
+        const textBody = (parsed.text ?? "").trim();
+        const htmlBody = typeof parsed.html === "string" ? parsed.html : "";
+        const decodedHtmlText = htmlBody.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+        // Prefer plain text version; fall back to decoded HTML text
+        const bodyForOtp = textBody.length > 0 ? textBody : decodedHtmlText;
+        const bodyPreview = bodyForOtp.substring(0, 300).replace(/\n/g, " ");
+        console.log(`[IMAP] Parsed body preview: ${bodyPreview}...`);
+        const otp = extractCbtlOtp(bodyForOtp);
         console.log(`[IMAP] OTP extraction result: ${otp ?? "null"}`);
 
         if (otp) {
@@ -178,31 +196,33 @@ export async function fetchCbtlOtpForEmail(
 }
 
 /**
- * Extract a 6-digit OTP from email body.
- * CBTL emails contain:
- *   - the OTP as a standalone 6-digit number (e.g. 292762)
- *   - an alphanumeric reference like "F89B45" — IGNORE this
- * Strategy: find all standalone 6-digit numeric runs and pick the first one.
- * Handles HTML emails by stripping tags first.
+ * Extract the 6-digit OTP from a CBTL email body.
+ * CBTL emails follow this format:
+ *   "Hi there, thanks for joining MyCBTL. Please use the code below ...
+ *    [10 minutes validity disclaimer]
+ *    855429
+ *    Please ensure that the OTP reference code displayed on the app is AFAEFF."
+ * Strategy: find the marker text, then return the FIRST 6-digit run AFTER it.
+ * This avoids matching random 6-digit sequences in DKIM signatures / headers /
+ * other random base64 content.
  */
-export function extractSixDigitOtp(body: string): string | null {
+export function extractCbtlOtp(body: string): string | null {
   if (!body) return null;
 
-  // Remove HTML tags for HTML emails
-  const textOnly = body.replace(/<[^>]+>/g, " ");
+  const markerIdx = body.toLowerCase().indexOf(OTP_MARKER.toLowerCase());
+  const searchScope = markerIdx >= 0 ? body.substring(markerIdx) : body;
 
-  // First try: look for 6 digits that are not adjacent to other digits or letters
-  // This avoids matching parts of longer numbers or alphanumeric codes
-  const strictMatches = textOnly.match(/(?<![A-Za-z0-9])\d{6}(?![A-Za-z0-9])/g);
-  if (strictMatches && strictMatches.length > 0) {
-    return strictMatches[0];
+  // Look for 6 digits that are not adjacent to other digits/letters
+  const strict = searchScope.match(/(?<![A-Za-z0-9])\d{6}(?![A-Za-z0-9])/g);
+  if (strict && strict.length > 0) {
+    return strict[0];
   }
-
-  // Second try: look for any 6 consecutive digits (more lenient)
-  const lenientMatches = textOnly.match(/\d{6}/g);
-  if (lenientMatches && lenientMatches.length > 0) {
-    return lenientMatches[0];
+  const lenient = searchScope.match(/\d{6}/g);
+  if (lenient && lenient.length > 0) {
+    return lenient[0];
   }
-
   return null;
 }
+
+// Backwards-compat export name (used elsewhere if any)
+export const extractSixDigitOtp = extractCbtlOtp;
