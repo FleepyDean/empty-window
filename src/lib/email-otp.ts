@@ -63,15 +63,13 @@ export async function fetchCbtlOtpForEmail(
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
-      // Use a broader search: look at emails from last 24 hours to handle timezone issues
-      // IMAP SINCE is date-only, so we search recent emails and filter by envelope
+      // IMAP SINCE is date-only (no time), so we go back 2 days to be safe
+      // We filter strictly by internalDate >= claim.createdAt below to avoid old emails
       const searchSince = new Date(since);
-      searchSince.setHours(searchSince.getHours() - 24); // Go back 24 hours to be safe
+      searchSince.setDate(searchSince.getDate() - 2);
 
-      console.log(`[IMAP] Searching emails from ${CBTL_FROM_DOMAIN} since ${searchSince.toISOString()}`);
+      console.log(`[IMAP] Searching emails from ${CBTL_FROM_DOMAIN} since ${searchSince.toISOString()} (claim created: ${since.toISOString()})`);
 
-      // Search by FROM domain + Since (broader search, filter by subject later)
-      // Using 'from' with domain should catch all CBTL emails
       const uids = await client.search(
         {
           from: CBTL_FROM_DOMAIN,
@@ -114,7 +112,14 @@ export async function fetchCbtlOtpForEmail(
 
         console.log(`[IMAP] Checking email: from=${fromAddr}, to=${toAddrs.join(", ")}, subject="${subject}", date=${internalDate}`);
 
-        // Subject must contain "OTP" (broader match for "Your OTP code", "OTP Verification", etc.)
+        // Strictly reject emails received BEFORE this claim was created
+        const emailDate = msg.internalDate ? new Date(msg.internalDate) : null;
+        if (!emailDate || emailDate < since) {
+          console.log(`[IMAP] Skipping: email date ${emailDate?.toISOString()} is before claim created ${since.toISOString()}`);
+          continue;
+        }
+
+        // Subject must contain "OTP"
         if (!subject.toLowerCase().includes(CBTL_SUBJECT_CONTAINS.toLowerCase())) {
           console.log(`[IMAP] Skipping: subject doesn't contain "${CBTL_SUBJECT_CONTAINS}"`);
           continue;
