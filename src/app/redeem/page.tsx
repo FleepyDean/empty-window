@@ -695,7 +695,7 @@ function RedeemPageContent() {
                               : claimState === "waiting_otp" && claimingProduct?.productKey === product.productKey
                                 ? "Waiting OTP..."
                                 : product.canClaim
-                                  ? "Get Number"
+                                  ? (product.productKey === "cbtl" ? "Get Email" : "Get Number")
                                   : "0 left"}
                         </button>
                       </div>

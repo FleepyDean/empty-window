@@ -7,7 +7,7 @@ const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 
 // CBTL OTP email signature
 const CBTL_FROM_DOMAIN = "thecoffeebeanandtealeaf.com";
-const CBTL_SUBJECT = "Your OTP code";
+const CBTL_SUBJECT_CONTAINS = "OTP";  // Broader match
 
 export type EmailOtpResult = {
   otp: string;
@@ -59,19 +59,20 @@ export async function fetchCbtlOtpForEmail(
       const searchSince = new Date(since);
       searchSince.setHours(searchSince.getHours() - 24); // Go back 24 hours to be safe
 
-      console.log(`[IMAP] Searching with subject "${CBTL_SUBJECT}" since ${searchSince.toISOString()}`);
+      console.log(`[IMAP] Searching emails from ${CBTL_FROM_DOMAIN} since ${searchSince.toISOString()}`);
 
-      // Search by Subject + Since (broader time window)
+      // Search by FROM domain + Since (broader search, filter by subject later)
+      // Using 'from' with domain should catch all CBTL emails
       const uids = await client.search(
         {
-          subject: CBTL_SUBJECT,
+          from: CBTL_FROM_DOMAIN,
           since: searchSince
         },
         { uid: true }
       );
 
       const uidArray = Array.isArray(uids) ? uids : [];
-      console.log(`[IMAP] Found ${uidArray.length} emails with subject "${CBTL_SUBJECT}"`);
+      console.log(`[IMAP] Found ${uidArray.length} emails from ${CBTL_FROM_DOMAIN}`);
 
       if (uidArray.length === 0) return null;
 
@@ -97,9 +98,9 @@ export async function fetchCbtlOtpForEmail(
 
         console.log(`[IMAP] Checking email: from=${fromAddr}, to=${toAddrs.join(", ")}, subject="${subject}", date=${internalDate}`);
 
-        // From must be CBTL
-        if (!fromAddr.includes(CBTL_FROM_DOMAIN)) {
-          console.log(`[IMAP] Skipping: from address doesn't match ${CBTL_FROM_DOMAIN}`);
+        // Subject must contain "OTP" (broader match for "Your OTP code", "OTP Verification", etc.)
+        if (!subject.toLowerCase().includes(CBTL_SUBJECT_CONTAINS.toLowerCase())) {
+          console.log(`[IMAP] Skipping: subject doesn't contain "${CBTL_SUBJECT_CONTAINS}"`);
           continue;
         }
 
