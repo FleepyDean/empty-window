@@ -7,7 +7,7 @@ const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 
 // CBTL OTP email signature
 // The actual sender is cmo-noreply@mycoffeebeanandtealeaf.com (MyCBTL)
-const CBTL_FROM_DOMAIN = "mycoffeebeanandtealeaf.com";
+const CBTL_FROM_DOMAIN = "my.coffeebeanandtealeaf.com";
 const CBTL_SUBJECT_CONTAINS = "OTP";  // Broader match
 
 export type EmailOtpResult = {
@@ -41,6 +41,8 @@ export async function fetchCbtlOtpForEmail(
   // Log for debugging (these appear in Railway logs)
   console.log(`[IMAP] Searching for OTP email to: ${toEmail}, since: ${since.toISOString()}`);
 
+  console.log(`[IMAP] Config: host=${IMAP_HOST}, port=${IMAP_PORT}, user=${IMAP_USER}, pass=${IMAP_PASS ? "SET (" + IMAP_PASS.length + " chars)" : "MISSING"}`);
+
   const client = new ImapFlow({
     host: IMAP_HOST,
     port: IMAP_PORT,
@@ -49,8 +51,14 @@ export async function fetchCbtlOtpForEmail(
     logger: false
   });
 
-  await client.connect();
-  console.log(`[IMAP] Connected to ${IMAP_HOST}`);
+  try {
+    await client.connect();
+    console.log(`[IMAP] Connected to ${IMAP_HOST}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[IMAP] CONNECT FAILED: ${msg}`);
+    throw err;
+  }
 
   try {
     const lock = await client.getMailboxLock("INBOX");

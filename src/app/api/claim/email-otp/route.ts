@@ -55,6 +55,9 @@ export async function POST(request: Request) {
     result = await fetchCbtlOtpForEmail(claim.emailAddress, claim.createdAt);
   } catch (err) {
     const message = err instanceof Error ? err.message : "IMAP error";
+    const stack = err instanceof Error ? err.stack : "";
+    console.error(`[IMAP] ERROR: ${message}`);
+    console.error(`[IMAP] STACK: ${stack}`);
     return NextResponse.json({ message }, { status: 502 });
   }
 
