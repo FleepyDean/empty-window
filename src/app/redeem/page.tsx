@@ -818,7 +818,7 @@ function RedeemPageContent() {
                         </>
                       )}
 
-                      {claimState === "success" && otp && (
+                      {claimState === "success" && otp && !emailOtp && (
                         <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
