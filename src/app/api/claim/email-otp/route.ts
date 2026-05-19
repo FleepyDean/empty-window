@@ -86,10 +86,33 @@ export async function POST(request: Request) {
       emailMessageId: result.messageId,
       emailFetchedAt: result.receivedAt,
       status: "success",
-      otp: result.otp,  // Use email OTP as the final OTP
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // Extend validity for display
+      otp: result.otp,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
     }
   });
+
+  // Deplete order or orderItem if quantity has reached 0
+  if (updated.orderItemId) {
+    const item = await prisma.orderItem.findUnique({ where: { id: updated.orderItemId } });
+    if (item && item.remainingQty <= 0) {
+      const allItems = await prisma.orderItem.findMany({ where: { orderId: updated.orderId } });
+      const allDepleted = allItems.every((i) => i.remainingQty <= 0);
+      if (allDepleted) {
+        await prisma.order.update({
+          where: { orderId: updated.orderId },
+          data: { status: "depleted" }
+        });
+      }
+    }
+  } else {
+    const order = await prisma.order.findUnique({ where: { orderId: updated.orderId } });
+    if (order && order.quantity <= 0) {
+      await prisma.order.update({
+        where: { orderId: updated.orderId },
+        data: { status: "depleted" }
+      });
+    }
+  }
 
   return NextResponse.json({
     status: "success",

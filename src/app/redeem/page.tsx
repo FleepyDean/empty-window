@@ -75,15 +75,21 @@ function RedeemPageContent() {
 
   const [infoModalProduct, setInfoModalProduct] = useState<ProductConfig | null>(null);
   const [productInstructions, setProductInstructions] = useState<Record<string, string>>({});
+  const [productVideos, setProductVideos] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch("/api/products/content")
       .then((r) => r.json())
       .then((d) => {
         if (d.products) {
-          const map: Record<string, string> = {};
-          for (const p of d.products) map[p.key] = p.redemptionInstructions;
-          setProductInstructions(map);
+          const instrMap: Record<string, string> = {};
+          const videoMap: Record<string, string> = {};
+          for (const p of d.products) {
+            instrMap[p.key] = p.redemptionInstructions;
+            if (p.tutorialVideoUrl) videoMap[p.key] = p.tutorialVideoUrl;
+          }
+          setProductInstructions(instrMap);
+          setProductVideos(videoMap);
         }
       })
       .catch(() => {});
@@ -651,8 +657,24 @@ function RedeemPageContent() {
             {activeTab === "products" && (
               <div className="mt-4 space-y-4">
                 {orderDetails.products.map((product) => (
+                  <div key={product.productKey + product.itemId} className="space-y-0">
+                    {productVideos[product.productKey] && (
+                      <div className="overflow-hidden border border-slate-200 dark:border-slate-700">
+                        <p className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-800/50">
+                          {product.productName} — Tutorial
+                        </p>
+                        <div className="aspect-video w-full bg-black">
+                          <iframe
+                            src={productVideos[product.productKey]}
+                            className="h-full w-full"
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            title={`${product.productName} Tutorial`}
+                          />
+                        </div>
+                      </div>
+                    )}
                   <div
-                    key={product.productKey + product.itemId}
                     className="flex items-center gap-4 border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50"
                   >
                     <img
@@ -722,6 +744,7 @@ function RedeemPageContent() {
                         </button>
                       </div>
                     )}
+                  </div>
                   </div>
                 ))}
 
