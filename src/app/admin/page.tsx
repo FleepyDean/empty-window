@@ -131,6 +131,17 @@ type CartItem = {
   quantity: number;
 };
 
+type EmailAccountRow = {
+  id: number;
+  emailAddress: string;
+  status: string;
+  claimId: string | null;
+  assignedAt: string | null;
+  voucherExpiresAt: string | null;
+  createdAt: string;
+  claim: { claimId: string; status: string; emailOtp: string | null; createdAt: string } | null;
+};
+
 type ProductContent = {
   key: string;
   name: string;
@@ -211,6 +222,83 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [editOrderId, setEditOrderId] = useState("");
   const [editQuantity, setEditQuantity] = useState(1);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ORDERS_PER_PAGE = 10;
+
+  // CBTL Email Accounts
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccountRow[]>([]);
+  const [emailAccountsLoading, setEmailAccountsLoading] = useState(false);
+  const [editingEmailId, setEditingEmailId] = useState<number | null>(null);
+  const [editEmailExpiry, setEditEmailExpiry] = useState("");
+  const [editEmailStatus, setEditEmailStatus] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  async function fetchEmailAccounts() {
+    setEmailAccountsLoading(true);
+    try {
+      const res = await fetch("/api/admin/email-accounts");
+      const data = await res.json();
+      if (res.ok) setEmailAccounts(data.accounts);
+      else toast.error(data.message ?? "Failed to fetch email accounts.");
+    } catch {
+      toast.error("Failed to fetch email accounts.");
+    } finally {
+      setEmailAccountsLoading(false);
+    }
+  }
+
+  function startEmailEdit(row: EmailAccountRow) {
+    setEditingEmailId(row.id);
+    setEditEmailStatus(row.status);
+    setEditEmailExpiry(row.voucherExpiresAt ? row.voucherExpiresAt.substring(0, 10) : "");
+  }
+
+  async function saveEmailEdit(id: number) {
+    setSavingEmail(true);
+    try {
+      const res = await fetch("/api/admin/email-accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          status: editEmailStatus,
+          voucherExpiresAt: editEmailExpiry || null
+        })
+      });
+      if (res.ok) {
+        toast.success("Updated.");
+        setEditingEmailId(null);
+        await fetchEmailAccounts();
+      } else {
+        const d = await res.json();
+        toast.error(d.message ?? "Failed to update.");
+      }
+    } catch {
+      toast.error("Failed to update.");
+    } finally {
+      setSavingEmail(false);
+    }
+  }
+
+  async function deleteEmailAccount(id: number, email: string) {
+    if (!confirm(`Delete ${email}?`)) return;
+    try {
+      const res = await fetch("/api/admin/email-accounts", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        toast.success("Deleted.");
+        await fetchEmailAccounts();
+      } else {
+        const d = await res.json();
+        toast.error(d.message ?? "Failed to delete.");
+      }
+    } catch {
+      toast.error("Failed to delete.");
+    }
+  }
 
   async function fetchBalance() {
     setBalanceLoading(true);
@@ -334,6 +422,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       if (res.ok) {
         setOrders(data.orders);
         setStats(data.stats);
+        setOrdersPage(1);
       }
     } catch {
       toast.error("Failed to fetch orders.");
@@ -839,7 +928,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Orders Table */}
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
+            <p className="mt-0.5 text-xs text-slate-400">{orders.length} total</p>
+          </div>
           <button
             onClick={fetchOrders}
             disabled={ordersLoading}
@@ -871,7 +963,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <td colSpan={7} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                orders.slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
                   <tr key={order.orderId} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-4 py-2">
                       {editingOrder === order.orderId ? (
@@ -961,6 +1053,206 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     </td>
                   </tr>
                 ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination */}
+        {orders.length > ORDERS_PER_PAGE && (
+          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+            <p className="text-xs text-slate-500">
+              Page {ordersPage} of {Math.ceil(orders.length / ORDERS_PER_PAGE)} · showing {Math.min(ordersPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setOrdersPage(1)}
+                disabled={ordersPage === 1}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >«</button>
+              <button
+                onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                disabled={ordersPage === 1}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >‹ Prev</button>
+              {Array.from({ length: Math.min(5, Math.ceil(orders.length / ORDERS_PER_PAGE)) }, (_, i) => {
+                const total = Math.ceil(orders.length / ORDERS_PER_PAGE);
+                let start = Math.max(1, ordersPage - 2);
+                if (start + 4 > total) start = Math.max(1, total - 4);
+                const page = start + i;
+                if (page > total) return null;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setOrdersPage(page)}
+                    className={`px-2.5 py-1 text-xs ${
+                      page === ordersPage
+                        ? "bg-cyan-500 font-semibold text-white"
+                        : "text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setOrdersPage((p) => Math.min(Math.ceil(orders.length / ORDERS_PER_PAGE), p + 1))}
+                disabled={ordersPage === Math.ceil(orders.length / ORDERS_PER_PAGE)}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >Next ›</button>
+              <button
+                onClick={() => setOrdersPage(Math.ceil(orders.length / ORDERS_PER_PAGE))}
+                disabled={ordersPage === Math.ceil(orders.length / ORDERS_PER_PAGE)}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >»</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CBTL Email Accounts */}
+      <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between p-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">CBTL Email Pool</h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {emailAccounts.filter((a) => a.status === "available").length} available ·{" "}
+              {emailAccounts.filter((a) => a.status === "used").length} used ·{" "}
+              {emailAccounts.length} total
+            </p>
+          </div>
+          <button
+            onClick={fetchEmailAccounts}
+            disabled={emailAccountsLoading}
+            className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+          >
+            {emailAccountsLoading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
+              <tr>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Email</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Voucher Expiry</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Last Claim</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">OTP Used</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Assigned</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {emailAccountsLoading ? (
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
+              ) : emailAccounts.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">No email accounts. Click Refresh to load.</td></tr>
+              ) : (
+                emailAccounts.map((row) => {
+                  const isExpired = row.voucherExpiresAt && new Date(row.voucherExpiresAt) < new Date();
+                  const expiresIn = row.voucherExpiresAt
+                    ? Math.ceil((new Date(row.voucherExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  return (
+                    <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="px-4 py-2 font-mono text-xs text-slate-900 dark:text-white">{row.emailAddress}</td>
+                      <td className="px-4 py-2">
+                        {editingEmailId === row.id ? (
+                          <select
+                            value={editEmailStatus}
+                            onChange={(e) => setEditEmailStatus(e.target.value)}
+                            className="border border-slate-300 bg-white px-2 py-1 text-xs outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                          >
+                            <option value="available">available</option>
+                            <option value="used">used</option>
+                            <option value="disabled">disabled</option>
+                          </select>
+                        ) : (
+                          <span className={`inline-block px-2 py-0.5 text-xs font-medium ${
+                            row.status === "available"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : row.status === "used"
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              : "bg-slate-500/10 text-slate-500"
+                          }`}>{row.status}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {editingEmailId === row.id ? (
+                          <input
+                            type="date"
+                            value={editEmailExpiry}
+                            onChange={(e) => setEditEmailExpiry(e.target.value)}
+                            className="border border-slate-300 bg-white px-2 py-1 text-xs outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                          />
+                        ) : row.voucherExpiresAt ? (
+                          <span className={`text-xs font-medium ${
+                            isExpired
+                              ? "text-red-600 dark:text-red-400"
+                              : expiresIn !== null && expiresIn <= 7
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}>
+                            {new Date(row.voucherExpiresAt).toLocaleDateString()}
+                            {isExpired ? " (expired)" : expiresIn !== null ? ` (${expiresIn}d)` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-500">
+                        {row.claim ? (
+                          <span className={`inline-block px-1.5 py-0.5 text-xs ${
+                            row.claim.status === "success"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "bg-slate-100 text-slate-500 dark:bg-slate-800"
+                          }`}>{row.claim.status}</span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {row.claim?.emailOtp ? (
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">{row.claim.emailOtp}</span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-500">
+                        {row.assignedAt ? new Date(row.assignedAt).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-4 py-2">
+                        {editingEmailId === row.id ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => saveEmailEdit(row.id)}
+                              disabled={savingEmail}
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
+                            >
+                              {savingEmail ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                              onClick={() => setEditingEmailId(null)}
+                              className="text-xs text-slate-500 hover:text-slate-400"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => startEmailEdit(row)}
+                              className="text-xs text-cyan-600 hover:text-cyan-500 dark:text-cyan-400"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deleteEmailAccount(row.id, row.emailAddress)}
+                              className="text-xs text-red-500 hover:text-red-400"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
