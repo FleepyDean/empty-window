@@ -132,14 +132,15 @@ model Claim {
 }
 
 model EmailAccount {
-  id           Int         @id @default(autoincrement())
-  emailAddress String      @unique // e.g., "r.e.dshocker33@gmail.com"
-  status       EmailStatus @default(available)
-  claimId      String?     @unique
-  claim        Claim?      @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
-  assignedAt   DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                Int         @id @default(autoincrement())
+  emailAddress      String      @unique // e.g., "r.e.dshocker33@gmail.com"
+  status            EmailStatus @default(available)
+  claimId           String?     @unique
+  claim             Claim?      @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
+  assignedAt        DateTime?
+  voucherExpiresAt  DateTime?   // Expiry date of the CBTL voucher in this account
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   @@index([status])
 }
