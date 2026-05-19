@@ -74,6 +74,27 @@ function RedeemPageContent() {
   const [activeTab, setActiveTab] = useState<"products" | "activations">("products");
 
   const [infoModalProduct, setInfoModalProduct] = useState<ProductConfig | null>(null);
+  const [productInstructions, setProductInstructions] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/products/content")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.products) {
+          const map: Record<string, string> = {};
+          for (const p of d.products) map[p.key] = p.redemptionInstructions;
+          setProductInstructions(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  function openInfoModal(productKey: string) {
+    const base = PRODUCT_MAP[productKey as keyof typeof PRODUCT_MAP];
+    if (!base) return;
+    const instructions = productInstructions[productKey] ?? base.redemptionInstructions;
+    setInfoModalProduct({ ...base, redemptionInstructions: instructions });
+  }
 
   // Active claim state (for current claiming session)
   const [activeClaim, setActiveClaim] = useState<ActiveClaim | null>(null);
@@ -651,7 +672,7 @@ function RedeemPageContent() {
                     {product.productType === "link" ? (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setInfoModalProduct(PRODUCT_MAP[product.productKey as keyof typeof PRODUCT_MAP])}
+                          onClick={() => openInfoModal(product.productKey)}
                           className="p-2 text-slate-400 transition hover:text-violet-600 dark:text-slate-500 dark:hover:text-violet-400"
                           title="View redemption info"
                         >
@@ -678,7 +699,7 @@ function RedeemPageContent() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setInfoModalProduct(PRODUCT_MAP[product.productKey as keyof typeof PRODUCT_MAP])}
+                          onClick={() => openInfoModal(product.productKey)}
                           className="p-2 text-slate-400 transition hover:text-violet-600 dark:text-slate-500 dark:hover:text-violet-400"
                           title="View redemption info"
                         >
