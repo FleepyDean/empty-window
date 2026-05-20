@@ -563,6 +563,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     fetchOrders();
     fetchPrices();
     fetchProductContents();
+    fetchEmailAccounts();
   }, []);
 
   return (
