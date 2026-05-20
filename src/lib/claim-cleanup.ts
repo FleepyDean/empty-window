@@ -42,6 +42,15 @@ export async function cleanupExpiredClaims(orderId?: string): Promise<number> {
           }
         }
 
+        // Release email back to pool if this was a CBTL claim
+        const emailAccount = await tx.emailAccount.findFirst({ where: { claimId: claim.claimId } });
+        if (emailAccount) {
+          await tx.emailAccount.update({
+            where: { id: emailAccount.id },
+            data: { status: "available", claimId: null, assignedAt: null }
+          });
+        }
+
         await tx.claim.update({
           where: { claimId: claim.claimId },
           data: { status: "expired", quantityDeducted: false }
