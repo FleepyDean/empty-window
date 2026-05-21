@@ -93,7 +93,13 @@ export async function fetchCbtlOtpForEmail(
       // Walk newest → oldest
       const sorted = [...uidArray].sort((a, b) => b - a);
       const targetTo = toEmail.toLowerCase().trim();
-      console.log(`[IMAP] Target to: ${targetTo}`);
+      // Canonical form strips dots from local part (Gmail ignores dots)
+      const canonicalize = (addr: string) => {
+        const [local, domain] = addr.toLowerCase().split("@");
+        return `${(local ?? "").replace(/\./g, "")}@${domain ?? ""}`;
+      };
+      const targetCanonical = canonicalize(targetTo);
+      console.log(`[IMAP] Target to: ${targetTo} (canonical: ${targetCanonical})`);
 
       for (const uid of sorted) {
         const msg = await client.fetchOne(
@@ -139,13 +145,14 @@ export async function fetchCbtlOtpForEmail(
           continue;
         }
 
-        // To must match the EXACT dotted address assigned to this claim.
-        // Do NOT fall back to canonical (dot-stripped) comparison — two concurrent
-        // claims on the same base inbox (e.g. re.dshock.er33 vs red.sh.ocker33)
-        // would otherwise steal each other's OTP.
-        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")}`);
-        if (!toAddrs.includes(targetTo)) {
-          console.log(`[IMAP] Skipping: to address doesn't exactly match ${targetTo}`);
+        // Match To: by canonical (dot-stripped) form — CBTL may send to a different
+        // dot variation than what was assigned (e.g. assigned re.dshocker.33 but
+        // CBTL sends to reds.hock.er33). Cross-claim OTP stealing is prevented
+        // separately by scoping excludeMessageIds to the same base inbox.
+        const toCanonicals = toAddrs.map(canonicalize);
+        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")} (canonicals: ${toCanonicals.join(", ")})`);
+        if (!toAddrs.includes(targetTo) && !toCanonicals.includes(targetCanonical)) {
+          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo} (canonical: ${targetCanonical})`);
           continue;
         }
 
