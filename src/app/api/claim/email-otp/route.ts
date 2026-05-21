@@ -49,14 +49,26 @@ export async function POST(request: Request) {
     });
   }
 
-  // Gather all OTPs and Message-IDs already used by other claims
-  const usedRecords = await prisma.claim.findMany({
+  // Derive the canonical base Gmail address (strip dots, drop +tag, lowercase)
+  const normalizeGmail = (addr: string) => {
+    const [local, domain] = addr.toLowerCase().split("@");
+    return local.replace(/\./g, "").split("+")[0] + "@" + domain;
+  };
+  const baseEmail = normalizeGmail(claim.emailAddress);
+
+  // Only exclude messageIds/OTPs used by claims sharing the SAME base Gmail inbox.
+  // Dotted variations (re.d.shocker33, r.edshocker33, etc.) all share one inbox,
+  // so we must not exclude messageIds consumed by a DIFFERENT base account.
+  const allUsedRecords = await prisma.claim.findMany({
     where: { emailOtp: { not: null }, claimId: { not: claimId } },
-    select: { emailOtp: true, emailMessageId: true }
+    select: { emailOtp: true, emailMessageId: true, emailAddress: true }
   });
-  const excludeOtps = usedRecords.map((r) => r.emailOtp as string);
-  const excludeMessageIds = usedRecords.map((r) => r.emailMessageId).filter(Boolean) as string[];
-  console.log(`[IMAP] Excluding ${excludeOtps.length} used OTPs, ${excludeMessageIds.length} used messageIds`);
+  const sameInboxRecords = allUsedRecords.filter(
+    (r) => r.emailAddress && normalizeGmail(r.emailAddress) === baseEmail
+  );
+  const excludeOtps = sameInboxRecords.map((r) => r.emailOtp as string);
+  const excludeMessageIds = sameInboxRecords.map((r) => r.emailMessageId).filter(Boolean) as string[];
+  console.log(`[IMAP] Base inbox: ${baseEmail} — excluding ${excludeOtps.length} used OTPs, ${excludeMessageIds.length} used messageIds`);
 
   // Poll inbox — search since claim creation
   let result;
