@@ -324,6 +324,33 @@ function RedeemPageContent() {
     }
   }
 
+  const [resettingOtp, setResettingOtp] = useState(false);
+
+  async function resetEmailOtp() {
+    if (!activeClaim?.claimId || resettingOtp) return;
+    setResettingOtp(true);
+    try {
+      const res = await fetch("/api/claim/email-otp", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimId: activeClaim.claimId })
+      });
+      if (res.ok) {
+        setEmailOtp(null);
+        setOtp(null);
+        setActiveClaim((prev) => prev ? { ...prev, emailOtp: null } : null);
+        toast.success("Ready for new OTP. Resend from the CBTL app now.");
+      } else {
+        const d = await res.json();
+        toast.error(d.message ?? "Could not reset OTP.");
+      }
+    } catch {
+      toast.error("Reset failed. Try again.");
+    } finally {
+      setResettingOtp(false);
+    }
+  }
+
   const cancelClaim = useCallback(async (reason: "cancelled" | "expired") => {
     if (!activeClaim?.claimId) return;
 
@@ -835,6 +862,13 @@ function RedeemPageContent() {
                             <p className="text-xs text-slate-500">• Login with the email for the 6-digit OTP from CBTL.</p>
                             <p className="text-xs text-slate-500">• The OTP will appear automatically once received.</p>
                             <p className="text-xs text-slate-500">• Once confirmed, your order is complete!</p>
+                            <button
+                              onClick={resetEmailOtp}
+                              disabled={resettingOtp}
+                              className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
+                            >
+                              {resettingOtp ? "Resetting..." : "Didn\u2019t receive OTP? Click here after resending from CBTL app"}
+                            </button>
                           </div>
                         </>
                       )}

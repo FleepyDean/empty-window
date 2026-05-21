@@ -3,6 +3,40 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 /**
+ * Reset the cached email OTP on a claim so the next POST re-scans IMAP.
+ * Used when user resends OTP from CBTL app and needs the system to pick up the new email.
+ */
+export async function DELETE(request: Request) {
+  const { claimId } = await request.json();
+  if (!claimId || typeof claimId !== "string") {
+    return NextResponse.json({ message: "claimId is required." }, { status: 400 });
+  }
+
+  const claim = await prisma.claim.findUnique({ where: { claimId } });
+  if (!claim) {
+    return NextResponse.json({ message: "Claim not found." }, { status: 404 });
+  }
+
+  // Only allow reset on active (non-terminal) claims
+  if (claim.status !== "waiting_otp") {
+    return NextResponse.json({ message: "Claim is no longer active." }, { status: 409 });
+  }
+
+  await prisma.claim.update({
+    where: { claimId },
+    data: {
+      emailOtp: null,
+      emailMessageId: null,
+      emailFetchedAt: null,
+      status: "waiting_otp",
+      otp: null
+    }
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+/**
  * Poll the assigned Gmail inbox for the CBTL email OTP.
  *
  * - If the claim already has an emailOtp stored, return it (cached).
