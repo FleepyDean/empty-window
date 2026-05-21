@@ -832,7 +832,7 @@ function RedeemPageContent() {
                             </button>
                           </div>
                           <div className="mt-2 border-l-2 border-emerald-500 bg-white p-3 dark:bg-slate-900">
-                            <p className="text-xs text-slate-500">• Check your email for the 6-digit OTP from CBTL.</p>
+                            <p className="text-xs text-slate-500">• Login with the email for the 6-digit OTP from CBTL.</p>
                             <p className="text-xs text-slate-500">• The OTP will appear automatically once received.</p>
                             <p className="text-xs text-slate-500">• Once confirmed, your order is complete!</p>
                           </div>
