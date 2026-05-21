@@ -93,13 +93,7 @@ export async function fetchCbtlOtpForEmail(
       // Walk newest → oldest
       const sorted = [...uidArray].sort((a, b) => b - a);
       const targetTo = toEmail.toLowerCase().trim();
-      // Canonical form strips dots from local part (Gmail ignores dots)
-      const canonicalize = (addr: string) => {
-        const [local, domain] = addr.split("@");
-        return `${(local ?? "").replace(/\./g, "")}@${domain ?? ""}`;
-      };
-      const targetCanonical = canonicalize(targetTo);
-      console.log(`[IMAP] Target to: ${targetTo} (canonical: ${targetCanonical})`);
+      console.log(`[IMAP] Target to: ${targetTo}`);
 
       for (const uid of sorted) {
         const msg = await client.fetchOne(
@@ -145,12 +139,13 @@ export async function fetchCbtlOtpForEmail(
           continue;
         }
 
-        // To must match — first try exact, then canonical (dot-stripped) comparison
-        const toCanonicals = toAddrs.map(canonicalize);
-        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")} (canonicals: ${toCanonicals.join(", ")})`);
-        const toMatches = toAddrs.includes(targetTo) || toCanonicals.includes(targetCanonical);
-        if (!toMatches) {
-          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo} or ${targetCanonical}`);
+        // To must match the EXACT dotted address assigned to this claim.
+        // Do NOT fall back to canonical (dot-stripped) comparison — two concurrent
+        // claims on the same base inbox (e.g. re.dshock.er33 vs red.sh.ocker33)
+        // would otherwise steal each other's OTP.
+        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")}`);
+        if (!toAddrs.includes(targetTo)) {
+          console.log(`[IMAP] Skipping: to address doesn't exactly match ${targetTo}`);
           continue;
         }
 
