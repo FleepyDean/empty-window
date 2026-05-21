@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Nishinae Store",
-  description: "Purchase OTP products and redeem with order ID."
+  description: "Redeem OTP products with your Shopee Order ID."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
