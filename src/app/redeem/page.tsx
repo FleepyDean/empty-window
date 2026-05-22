@@ -513,8 +513,23 @@ function RedeemPageContent() {
           }
         } else if (data.status === "success") {
           setOtp(data.otp);
+          setEmailOtp(data.emailOtp ?? null);
           setClaimState("success");
-          clearActiveClaimId();
+          // For CBTL: restore activeClaim so email/OTP display persists across refresh
+          if (data.emailAddress) {
+            setActiveClaim({
+              claimId: data.claimId,
+              phoneNumber: data.phoneNumber ?? "",
+              emailAddress: data.emailAddress,
+              emailOtp: data.emailOtp ?? null,
+              productName: data.productName || "Coffee Bean & Tea Leaf",
+              productKey: "cbtl",
+              expiresAt: data.expiresAt
+            });
+            setActiveClaimId(data.claimId);
+          } else {
+            clearActiveClaimId();
+          }
         } else {
           setClaimState(data.status);
           clearActiveClaimId();
@@ -575,6 +590,38 @@ function RedeemPageContent() {
     }, 5000);
     return () => clearInterval(interval);
   }, [orderDetails?.orderId]);
+
+  // Auto-restore successful CBTL claim from order history when page loads
+  useEffect(() => {
+    if (!orderDetails || activeClaim || claimState !== "idle") return;
+
+    // Find the most recent successful CBTL claim with email OTP
+    const successfulCbtlClaim = orderDetails.claims.find(
+      (c) => c.status === "success" && c.productKey === "cbtl" && c.emailAddress
+    );
+
+    if (successfulCbtlClaim) {
+      setActiveClaim({
+        claimId: successfulCbtlClaim.claimId,
+        phoneNumber: successfulCbtlClaim.phoneNumber ?? "",
+        emailAddress: successfulCbtlClaim.emailAddress,
+        emailOtp: successfulCbtlClaim.emailOtp ?? null,
+        productName: successfulCbtlClaim.productName,
+        productKey: successfulCbtlClaim.productKey,
+        expiresAt: new Date(successfulCbtlClaim.expiresAt).getTime()
+      });
+      setEmailOtp(successfulCbtlClaim.emailOtp ?? null);
+      setOtp(successfulCbtlClaim.otp ?? null);
+      setClaimState("success");
+      setActiveClaimId(successfulCbtlClaim.claimId);
+
+      // Also set claimingProduct so the UI shows the product context
+      const match = orderDetails.products.find(
+        (p) => p.productKey === successfulCbtlClaim.productKey
+      );
+      if (match) setClaimingProduct(match);
+    }
+  }, [orderDetails]);
 
   // Link restored activeClaim to a product once orderDetails is loaded
   useEffect(() => {

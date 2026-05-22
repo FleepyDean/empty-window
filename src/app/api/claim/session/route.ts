@@ -43,6 +43,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     claimId: claim.claimId,
     phoneNumber: claim.phoneNumber,
+    emailAddress: claim.emailAddress,
+    emailOtp: claim.emailOtp,
     expiresAt: claim.expiresAt.getTime(),
     status: claim.status,
     otp: claim.otp
