@@ -23,11 +23,13 @@ export async function POST(request: Request) {
       items: {
         include: {
           claims: {
+            include: { luckinAccount: true },
             orderBy: { createdAt: "desc" }
           }
         }
       },
       claims: {
+        include: { luckinAccount: true },
         orderBy: { createdAt: "desc" }
       }
     }
@@ -87,7 +89,11 @@ export async function POST(request: Request) {
           otp: claim.otp,
           status: claim.status,
           createdAt: claim.createdAt.toISOString(),
-          expiresAt: claim.expiresAt.toISOString()
+          expiresAt: claim.expiresAt.toISOString(),
+          luckinAccount: claim.luckinAccount ? {
+            email: claim.luckinAccount.email,
+            password: claim.luckinAccount.password
+          } : null
         }))
       )
     : order.claims.map((claim) => ({
@@ -100,7 +106,11 @@ export async function POST(request: Request) {
         otp: claim.otp,
         status: claim.status,
         createdAt: claim.createdAt.toISOString(),
-        expiresAt: claim.expiresAt.toISOString()
+        expiresAt: claim.expiresAt.toISOString(),
+        luckinAccount: claim.luckinAccount ? {
+          email: claim.luckinAccount.email,
+          password: claim.luckinAccount.password
+        } : null
       }));
 
   // Sort claims by date descending

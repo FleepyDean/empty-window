@@ -29,8 +29,9 @@ type OrderProduct = {
   remainingQty: number;
   canClaim: boolean;
   logoUrl: string;
-  productType: "otp" | "link";
+  productType: "otp" | "link" | "account";
   linkUrl: string | null;
+  accountType?: "luckin";
 };
 
 type ClaimHistoryItem = {
@@ -44,6 +45,7 @@ type ClaimHistoryItem = {
   status: string;
   createdAt: string;
   expiresAt: string;
+  luckinAccount: { email: string; password: string } | null;
 };
 
 type ClaimPhase = "email" | "phone" | "otp" | null;
@@ -53,6 +55,7 @@ type ActiveClaim = {
   phoneNumber: string;
   emailAddress: string | null;
   emailOtp: string | null;
+  accountPassword?: string | null;
   productName: string;
   productKey: string;
   expiresAt: number;
@@ -306,12 +309,15 @@ function RedeemPageContent() {
 
       // CBTL: email-first flow
       const isCbtl = product.productKey === "cbtl";
+      // Luckin: account-type product (email + password)
+      const isAccountProduct = product.productType === "account";
 
       setActiveClaim({
         claimId: data.claimId,
         phoneNumber: data.phoneNumber ?? "",
         emailAddress: data.emailAddress ?? null,
         emailOtp: data.emailOtp ?? null,
+        accountPassword: data.accountPassword ?? null,
         productName: product.productName,
         productKey: product.productKey,
         expiresAt: data.expiresAt ?? Date.now() + CLAIM_DURATION_MS
@@ -319,7 +325,12 @@ function RedeemPageContent() {
       setExpiresAt(data.expiresAt ?? Date.now() + CLAIM_DURATION_MS);
       setTimeLeftMs((data.expiresAt ?? Date.now() + CLAIM_DURATION_MS) - Date.now());
 
-      if (isCbtl && data.resumeNewOtp) {
+      if (isAccountProduct && data.emailAddress) {
+        // Luckin account — show email + password immediately
+        setClaimState("success");
+        setOtp(null);
+        toast.success(`Account assigned for ${product.productName}. Use the credentials below to log in.`);
+      } else if (isCbtl && data.resumeNewOtp) {
         // Existing success claim — show it with option to request new OTP
         setClaimState("success");
         setEmailOtp(data.emailOtp ?? null);
@@ -514,8 +525,9 @@ function RedeemPageContent() {
             phoneNumber: data.phoneNumber ?? "",
             emailAddress: data.emailAddress ?? null,
             emailOtp: data.emailOtp ?? null,
+            accountPassword: data.accountPassword ?? null,
             productName: data.productName || "Product",
-            productKey: "unknown",
+            productKey: data.productKey || "unknown",
             expiresAt: data.expiresAt
           });
           setExpiresAt(data.expiresAt);
@@ -530,15 +542,16 @@ function RedeemPageContent() {
           setOtp(data.otp);
           setEmailOtp(data.emailOtp ?? null);
           setClaimState("success");
-          // For CBTL: restore activeClaim so email/OTP display persists across refresh
+          // For email-based claims (CBTL, Luckin): restore activeClaim so credentials display persists across refresh
           if (data.emailAddress) {
             setActiveClaim({
               claimId: data.claimId,
               phoneNumber: data.phoneNumber ?? "",
               emailAddress: data.emailAddress,
               emailOtp: data.emailOtp ?? null,
-              productName: data.productName || "Coffee Bean & Tea Leaf",
-              productKey: "cbtl",
+              accountPassword: data.accountPassword ?? null,
+              productName: data.productName || "Product",
+              productKey: data.productKey || "unknown",
               expiresAt: data.expiresAt
             });
             setActiveClaimId(data.claimId);
@@ -881,7 +894,7 @@ function RedeemPageContent() {
                               : claimState === "waiting_otp" && claimingProduct?.productKey === product.productKey
                                 ? "Waiting OTP..."
                                 : product.canClaim
-                                  ? (product.productKey === "cbtl" ? "Get Email" : "Get Number")
+                                  ? (product.productType === "account" ? "Get Account" : product.productKey === "cbtl" ? "Get Email" : "Get Number")
                                   : "0 left"}
                         </button>
                       </div>
@@ -913,6 +926,23 @@ function RedeemPageContent() {
                               onClick={() => navigator.clipboard.writeText(activeClaim.emailAddress ?? "")}
                               className="p-2 text-slate-400 transition hover:text-cyan-600"
                               title="Copy email"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Account Password Display (for Luckin and account-type products) */}
+                      {activeClaim.accountPassword && (
+                        <div className="mt-2">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Password:</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">{activeClaim.accountPassword}</p>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(activeClaim.accountPassword ?? "")}
+                              className="p-2 text-slate-400 transition hover:text-cyan-600"
+                              title="Copy password"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                             </button>
@@ -1100,6 +1130,20 @@ function RedeemPageContent() {
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                             </button>
+                          </div>
+                        ) : claim.status === "success" && claim.luckinAccount ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">Password:</span>
+                              <span className="font-mono text-sm font-bold text-cyan-600 dark:text-cyan-400">{claim.luckinAccount.password}</span>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(claim.luckinAccount!.password)}
+                                className="p-1 text-slate-400 transition hover:text-cyan-600"
+                                title="Copy password"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                              </button>
+                            </div>
                           </div>
                         ) : claim.status === "cancelled" ? (
                           <span className="text-sm text-red-600 dark:text-red-400">Cancelled</span>

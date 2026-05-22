@@ -38,109 +38,130 @@ enum EmailStatus {
 }
 
 model Order {
-  id        Int         @id @default(autoincrement())
-  orderId   String      @unique
+  id               Int         @id @default(autoincrement())
+  orderId          String      @unique
   // Legacy single-product fields (for backward compatibility)
-  productKey String     @default("zus")
-  productName String    @default("ZUS Coffee")
-  serviceCode String    @default("aik")
-  heroServiceCode String @default("aik")
-  quantity  Int
+  productKey       String      @default("zus")
+  productName      String      @default("ZUS Coffee")
+  serviceCode      String      @default("aik")
+  heroServiceCode  String      @default("aik")
+  quantity         Int
   // New multi-product cart support
-  items     OrderItem[]
-  isCartOrder Boolean   @default(false)
-  replacementCount Int  @default(0)
-  status    OrderStatus @default(pending_payment)
-  source    String      @default("web") // "web" | "shopee" | "admin"
-  externalRef String?   @unique // Shopee Order ID for dedup
-  totalPrice Decimal    @default(0)
-  claims    Claim[]
-  payment   Payment?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  items            OrderItem[]
+  isCartOrder      Boolean     @default(false)
+  replacementCount Int         @default(0)
+  status           OrderStatus @default(pending_payment)
+  source           String      @default("web") // "web" | "shopee" | "admin"
+  externalRef      String?     @unique // Shopee Order ID for dedup
+  totalPrice       Decimal     @default(0)
+  claims           Claim[]
+  payment          Payment?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }
 
 model OrderItem {
-  id              Int      @id @default(autoincrement())
-  orderId         String
-  order           Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  productKey      String
-  productName     String
-  serviceCode     String
-  heroServiceCode String
-  quantity        Int
-  remainingQty    Int      // Quantity left to claim
-  replacementCount Int    @default(0)
-  pricePerUnit    Decimal  @default(0)
-  claims          Claim[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               Int      @id @default(autoincrement())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  productKey       String
+  productName      String
+  serviceCode      String
+  heroServiceCode  String
+  quantity         Int
+  remainingQty     Int // Quantity left to claim
+  replacementCount Int      @default(0)
+  pricePerUnit     Decimal  @default(0)
+  claims           Claim[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([orderId])
 }
 
 model Payment {
-  id            Int           @id @default(autoincrement())
-  orderId       String        @unique
-  order         Order         @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  billCode      String        @unique
+  id              Int           @id @default(autoincrement())
+  orderId         String        @unique
+  order           Order         @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  billCode        String        @unique
   billExternalRef String?
-  amount        Decimal       @default(0)
-  status        PaymentStatus @default(pending)
-  paidAt        DateTime?
-  transactionId String?
-  metadata      String?       // JSON string for extra data
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  amount          Decimal       @default(0)
+  status          PaymentStatus @default(pending)
+  paidAt          DateTime?
+  transactionId   String?
+  metadata        String? // JSON string for extra data
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model ProductSetting {
   id                     Int      @id @default(autoincrement())
   productKey             String   @unique
   priceLabel             String
-  redemptionInstructions String?  // Overrides hardcoded instructions
-  tutorialSteps          String?  // JSON array of step strings
-  tutorialVideoUrl       String?  // YouTube embed URL
+  redemptionInstructions String? // Overrides hardcoded instructions
+  tutorialSteps          String? // JSON array of step strings
+  tutorialVideoUrl       String? // YouTube embed URL
   updatedAt              DateTime @updatedAt
 }
 
 model Claim {
-  id               Int         @id @default(autoincrement())
-  claimId          String      @unique
+  id               Int            @id @default(autoincrement())
+  claimId          String         @unique
   orderId          String
-  order            Order       @relation(fields: [orderId], references: [orderId], onDelete: Restrict, onUpdate: Cascade)
-  orderItemId      Int?        // Links to specific OrderItem for cart orders
-  orderItem        OrderItem?  @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  phoneNumber      String?     // Optional: CBTL claims start in email phase, get phone later
-  heroActivationId String?     @unique
-  status           ClaimStatus @default(waiting_otp)
+  order            Order          @relation(fields: [orderId], references: [orderId], onDelete: Restrict, onUpdate: Cascade)
+  orderItemId      Int? // Links to specific OrderItem for cart orders
+  orderItem        OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  phoneNumber      String? // Optional: CBTL claims start in email phase, get phone later
+  heroActivationId String?        @unique
+  status           ClaimStatus    @default(waiting_otp)
   otp              String?
   expiresAt        DateTime
-  quantityDeducted Boolean     @default(false)
-  operator         String?     // HeroSMS operator used (null = any)
+  quantityDeducted Boolean        @default(false)
+  operator         String? // HeroSMS operator used (null = any)
   // Email OTP fields (used by CBTL)
-  emailAddress     String?     // Assigned dotted Gmail variation
-  emailOtp         String?     // 6-digit OTP fetched from inbox
-  emailMessageId   String?     // IMAP Message-ID of the email used (prevents reuse)
+  emailAddress     String? // Assigned dotted Gmail variation
+  emailOtp         String? // 6-digit OTP fetched from inbox
+  emailMessageId   String? // IMAP Message-ID of the email used (prevents reuse)
   emailFetchedAt   DateTime?
   emailAccount     EmailAccount?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  luckinAccount    LuckinAccount?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([orderId, status])
   @@index([orderItemId])
 }
 
 model EmailAccount {
-  id                Int         @id @default(autoincrement())
-  emailAddress      String      @unique // e.g., "r.e.dshocker33@gmail.com"
-  status            EmailStatus @default(available)
-  claimId           String?     @unique
-  claim             Claim?      @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
-  assignedAt        DateTime?
-  voucherExpiresAt  DateTime?   // Expiry date of the CBTL voucher in this account
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id               Int         @id @default(autoincrement())
+  emailAddress     String      @unique // e.g., "r.e.dshocker33@gmail.com"
+  status           EmailStatus @default(available)
+  claimId          String?     @unique
+  claim            Claim?      @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
+  assignedAt       DateTime?
+  voucherExpiresAt DateTime? // Expiry date of the CBTL voucher in this account
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([status])
+}
+
+enum LuckinAccountStatus {
+  available
+  used
+  disabled
+}
+
+model LuckinAccount {
+  id         Int                 @id @default(autoincrement())
+  email      String              @unique
+  password   String
+  status     LuckinAccountStatus @default(available)
+  claimId    String?             @unique
+  claim      Claim?              @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
+  assignedAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
 
   @@index([status])
 }

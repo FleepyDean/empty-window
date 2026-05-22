@@ -1,4 +1,4 @@
-export type ProductKey = "zus" | "chagee" | "tealive" | "kfc" | "cbtl" | "gigi" | "winrar";
+export type ProductKey = "zus" | "chagee" | "tealive" | "kfc" | "cbtl" | "gigi" | "winrar" | "luckin";
 
 export type ProductConfig = {
   key: ProductKey;
@@ -8,8 +8,9 @@ export type ProductConfig = {
   priceLabel: string;
   logoUrl: string;
   redemptionInstructions: string;
-  productType: "otp" | "link";
+  productType: "otp" | "link" | "account";
   linkUrl?: string; // Static link for link-type products
+  accountType?: "luckin"; // For account-type products, specifies which account pool to use
 };
 
 const ZUS_INSTRUCTIONS = `📦 Preferably for PICKUP — If want DELIVERY, remark your own phone number before checkout.
@@ -153,6 +154,21 @@ const WINRAR_INSTRUCTIONS = `💻 WinRAR Lifetime License
 
 We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
 
+const LUCKIN_INSTRUCTIONS = `📦 Available for PICKUP and DELIVERY
+
+✅ Steps to Redeem (READ CAREFULLY):
+- Click "Get Account" to receive a pre-registered Luckin Coffee account
+- Copy the email and password provided
+- Open Luckin Coffee app and tap "Log In"
+- Enter the email and password provided
+- You may need to verify with an SMS code — the app will prompt you if needed
+
+⚠️ Do NOT change the password or account details.
+⚠️ Do NOT create a new account — use the provided account only.
+✅ Please follow all instructions carefully.
+
+We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
+
 export const PRODUCT_CATALOG: ProductConfig[] = [
   { key: "cbtl", productType: "otp", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
   { key: "kfc", productType: "otp", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
@@ -160,7 +176,8 @@ export const PRODUCT_CATALOG: ProductConfig[] = [
   { key: "tealive", productType: "otp", name: "Tealive", serviceCode: "avb", heroServiceCode: "avb", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_INSTRUCTIONS },
   { key: "chagee", productType: "otp", name: "Chagee", serviceCode: "bwx", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s", redemptionInstructions: CHAGEE_INSTRUCTIONS },
   { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS, productType: "otp" },
-  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://images.wincrunch.com/winrar-logo.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" }
+  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://images.wincrunch.com/winrar-logo.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" },
+  { key: "luckin", name: "Luckin Coffee", serviceCode: "luckin", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://1000logos.net/wp-content/uploads/2025/09/Luckin-Coffee-Logo.png", redemptionInstructions: LUCKIN_INSTRUCTIONS, productType: "account", accountType: "luckin" }
 ];
 
 export const PRODUCT_MAP: Record<ProductKey, ProductConfig> = PRODUCT_CATALOG.reduce(
