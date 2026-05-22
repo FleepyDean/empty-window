@@ -165,6 +165,21 @@ function RedeemPageContent() {
 
       setOrderDetails(data);
       setActiveTab("products");
+
+      // Clear any stale active claim from previous orders to prevent cache mix-up
+      if (activeClaim && activeClaim.claimId) {
+        const isClaimForCurrentOrder = data.claims.some(
+          (c) => c.claimId === activeClaim.claimId
+        );
+        if (!isClaimForCurrentOrder) {
+          setActiveClaim(null);
+          setClaimState("idle");
+          setEmailOtp(null);
+          setOtp(null);
+          clearActiveClaimId();
+        }
+      }
+
       const trimmed = orderIdInput.trim();
       localStorage.setItem(LAST_ORDER_ID_KEY, trimmed);
       // Persist orderId in URL so refresh / in-app browser navigation retains state
@@ -562,6 +577,13 @@ function RedeemPageContent() {
           if (urlOrderId !== targetId) {
             router.replace(`${pathname}?orderId=${encodeURIComponent(targetId)}`);
           }
+          // Clear stale claim if it doesn't belong to this order
+          const savedClaimId = localStorage.getItem(ACTIVE_CLAIM_ID_KEY);
+          if (savedClaimId && !data.claims.some((c) => c.claimId === savedClaimId)) {
+            clearActiveClaimId();
+            setActiveClaim(null);
+            setClaimState("idle");
+          }
         } else if (!urlOrderId) {
           localStorage.removeItem(LAST_ORDER_ID_KEY);
         }
@@ -583,7 +605,17 @@ function RedeemPageContent() {
           body: JSON.stringify({ orderId: orderDetails.orderId })
         });
         const data = (await response.json()) as OrderDetailsResponse;
-        if (response.ok && data.valid) setOrderDetails(data);
+        if (response.ok && data.valid) {
+          setOrderDetails(data);
+          // If active claim no longer exists in this order, clear it
+          if (activeClaim && !data.claims.some((c) => c.claimId === activeClaim.claimId)) {
+            setActiveClaim(null);
+            setClaimState("idle");
+            setEmailOtp(null);
+            setOtp(null);
+            clearActiveClaimId();
+          }
+        }
       } catch {
         // ignore transient errors
       }
