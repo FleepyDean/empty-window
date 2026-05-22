@@ -304,8 +304,14 @@ function RedeemPageContent() {
       setExpiresAt(data.expiresAt ?? Date.now() + CLAIM_DURATION_MS);
       setTimeLeftMs((data.expiresAt ?? Date.now() + CLAIM_DURATION_MS) - Date.now());
 
-      if (isCbtl && data.emailAddress) {
-        // CBTL email phase
+      if (isCbtl && data.resumeNewOtp) {
+        // Existing success claim — show it with option to request new OTP
+        setClaimState("success");
+        setEmailOtp(data.emailOtp ?? null);
+        setOtp(data.emailOtp ?? null);
+        toast.message(`Email ${data.emailAddress} already assigned. OTP expired? Use the button below.`);
+      } else if (isCbtl && data.emailAddress) {
+        // CBTL email phase — new claim
         setClaimState("waiting_email");
         setEmailOtp(data.emailOtp ?? null);
         toast.success(`Email ${data.emailAddress} assigned. Check your email for OTP.`);
@@ -325,6 +331,36 @@ function RedeemPageContent() {
   }
 
   const [resettingOtp, setResettingOtp] = useState(false);
+  const [requestingNewOtp, setRequestingNewOtp] = useState(false);
+
+  async function requestNewOtp() {
+    if (!activeClaim?.claimId || requestingNewOtp) return;
+    setRequestingNewOtp(true);
+    try {
+      const res = await fetch("/api/claim/request-new-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimId: activeClaim.claimId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailOtp(null);
+        setOtp(null);
+        setActiveClaim((prev) => prev ? { ...prev, emailOtp: null, expiresAt: data.expiresAt } : null);
+        setExpiresAt(data.expiresAt);
+        setTimeLeftMs(data.expiresAt - Date.now());
+        setClaimState("waiting_email");
+        setActiveClaimId(activeClaim.claimId);
+        toast.success("Ready for new OTP — resend from the CBTL app using the same email.");
+      } else {
+        toast.error(data.message ?? "Could not request new OTP.");
+      }
+    } catch {
+      toast.error("Request failed. Try again.");
+    } finally {
+      setRequestingNewOtp(false);
+    }
+  }
 
   async function resetEmailOtp() {
     if (!activeClaim?.claimId || resettingOtp) return;
@@ -896,6 +932,19 @@ function RedeemPageContent() {
                         </>
                       )}
 
+                      {claimState === "success" && emailOtp && (
+                        <div className="mt-3 border-l-2 border-slate-300 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">If the OTP above has expired on the CBTL app, you can request a fresh one using the same email.</p>
+                          <button
+                            onClick={requestNewOtp}
+                            disabled={requestingNewOtp}
+                            className="mt-2 border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-400"
+                          >
+                            {requestingNewOtp ? "Requesting..." : "OTP expired? Request new OTP"}
+                          </button>
+                        </div>
+                      )}
+
                       {claimState === "success" && otp && !emailOtp && (
                         <motion.div
                           initial={{ opacity: 0 }}
@@ -941,7 +990,12 @@ function RedeemPageContent() {
                       />
                       <div className="flex-1">
                         <h3 className="font-medium text-slate-900 dark:text-white">{claim.productName}</h3>
-                        <p className="text-sm font-mono text-slate-600 dark:text-slate-400">{claim.phoneNumber?.replace(/^6/, "")}</p>
+                        {claim.emailAddress && (
+                          <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400">{claim.emailAddress}</p>
+                        )}
+                        {claim.phoneNumber && (
+                          <p className="text-sm font-mono text-slate-600 dark:text-slate-400">{claim.phoneNumber.replace(/^6/, "")}</p>
+                        )}
                       </div>
                       <div className="text-right">
                         {claim.status === "success" && claim.otp ? (

@@ -109,6 +109,33 @@ export async function POST(request: Request) {
     });
   }
 
+  // For CBTL: if there's already a success claim on this order item with an email assigned,
+  // return it so the user can request a new OTP on the same email address instead of
+  // consuming a new email from the pool.
+  if (isEmailFirst) {
+    const existingSuccessClaim = await prisma.claim.findFirst({
+      where: {
+        orderId: trimmedOrderId,
+        ...(targetItemId ? { orderItemId: targetItemId } : {}),
+        status: "success",
+        emailAddress: { not: null }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (existingSuccessClaim) {
+      return NextResponse.json({
+        claimId: existingSuccessClaim.claimId,
+        phoneNumber: null,
+        emailAddress: existingSuccessClaim.emailAddress,
+        emailOtp: existingSuccessClaim.emailOtp,
+        expiresAt: existingSuccessClaim.expiresAt.getTime(),
+        productName,
+        resumeNewOtp: true
+      });
+    }
+  }
+
   // Before creating new claim, auto-cancel any expired claims and restore their quantities
   await cleanupExpiredClaims(trimmedOrderId);
 
