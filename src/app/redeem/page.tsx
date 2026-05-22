@@ -915,8 +915,8 @@ function RedeemPageContent() {
                           <div className="flex items-start gap-3">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
                             <div>
-                              <p className="font-bold text-amber-800 dark:text-amber-300">IMPORTANT: Click "Log In" NOT "Create Account"</p>
-                              <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">In the CBTL app, tap <strong className="font-semibold">"Log In"</strong> (not "Create Account") when you see the Register/Login screen. Use the email address above to log in.</p>
+                              <p className="font-bold text-amber-800 dark:text-amber-300">IMPORTANT: Click &quot;Log In&quot; NOT &quot;Create Account&quot;</p>
+                              <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">In the CBTL app, tap <strong className="font-semibold">&quot;Log In&quot;</strong> (not &quot;Create Account&quot;) when you see the Register/Login screen. Use the email address above to log in.</p>
                             </div>
                           </div>
                         </div>
