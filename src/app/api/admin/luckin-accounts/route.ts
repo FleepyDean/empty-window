@@ -26,7 +26,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: "id is required" }, { status: 400 });
   }
 
-  const data: any = {};
+  const data: Record<string, unknown> = {};
   if (status !== undefined) data.status = status;
   if (voucherExpiresAt !== undefined) {
     data.voucherExpiresAt = voucherExpiresAt ? new Date(voucherExpiresAt) : null;
