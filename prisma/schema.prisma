@@ -153,15 +153,16 @@ enum LuckinAccountStatus {
 }
 
 model LuckinAccount {
-  id         Int                 @id @default(autoincrement())
-  email      String              @unique
-  password   String
-  status     LuckinAccountStatus @default(available)
-  claimId    String?             @unique
-  claim      Claim?              @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
-  assignedAt DateTime?
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  id               Int                 @id @default(autoincrement())
+  email            String              @unique
+  password         String
+  status           LuckinAccountStatus @default(available)
+  claimId          String?             @unique
+  claim            Claim?              @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
+  assignedAt       DateTime?
+  voucherExpiresAt DateTime? // Expiry date of the Luckin Coffee voucher in this account
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@index([status])
 }

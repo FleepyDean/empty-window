@@ -20,17 +20,21 @@ export async function GET() {
 export async function PATCH(request: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const { id, status } = await request.json();
+  const { id, status, voucherExpiresAt } = await request.json();
 
   if (!id || typeof id !== "number") {
     return NextResponse.json({ message: "id is required" }, { status: 400 });
   }
 
+  const data: any = {};
+  if (status !== undefined) data.status = status;
+  if (voucherExpiresAt !== undefined) {
+    data.voucherExpiresAt = voucherExpiresAt ? new Date(voucherExpiresAt) : null;
+  }
+
   const updated = await prisma.luckinAccount.update({
     where: { id },
-    data: {
-      ...(status !== undefined && { status })
-    }
+    data
   });
 
   return NextResponse.json({ account: updated });

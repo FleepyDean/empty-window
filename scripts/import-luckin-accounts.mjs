@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 
 /**
  * Import Luckin Coffee accounts from a CSV or JSON file
- * CSV format: email,password
- * JSON format: [{ "email": "...", "password": "..." }]
+ * CSV format: email,password,voucherExpiresAt (optional, YYYY-MM-DD)
+ * JSON format: [{ "email": "...", "password": "...", "voucherExpiresAt": "2025-12-31" }]
  */
 async function main() {
   const filePath = process.argv[2];
@@ -15,7 +15,8 @@ async function main() {
   if (!filePath) {
     console.log("Usage: node import-luckin-accounts.mjs <path-to-file>");
     console.log("");
-    console.log("Supports CSV (email,password) or JSON [{email,password}] format");
+    console.log("Supports CSV (email,password,expiry) or JSON [{email,password,voucherExpiresAt}] format");
+    console.log("Expiry date is optional (YYYY-MM-DD format)");
     process.exit(1);
   }
 
@@ -35,9 +36,12 @@ async function main() {
       // Skip header if present
       const startIdx = lines[0].includes("email") ? 1 : 0;
       for (let i = startIdx; i < lines.length; i++) {
-        const [email, password] = lines[i].split(",").map(s => s.trim());
+        const parts = lines[i].split(",").map(s => s.trim());
+        const email = parts[0];
+        const password = parts[1];
+        const voucherExpiresAt = parts[2] || null;
         if (email && password) {
-          accounts.push({ email, password });
+          accounts.push({ email, password, voucherExpiresAt });
         }
       }
     } else {
@@ -56,17 +60,22 @@ async function main() {
 
   for (const account of accounts) {
     try {
+      const expiryDate = account.voucherExpiresAt ? new Date(account.voucherExpiresAt) : null;
       await prisma.luckinAccount.upsert({
         where: { email: account.email },
-        update: { password: account.password },
+        update: { 
+          password: account.password,
+          ...(expiryDate && { voucherExpiresAt: expiryDate })
+        },
         create: {
           email: account.email,
           password: account.password,
-          status: "available"
+          status: "available",
+          ...(expiryDate && { voucherExpiresAt: expiryDate })
         }
       });
       inserted++;
-      console.log(`✓ ${account.email}`);
+      console.log(`✓ ${account.email}${expiryDate ? ` (expires: ${account.voucherExpiresAt})` : ""}`);
     } catch (err) {
       console.error(`✗ Failed to insert ${account.email}:`, err.message);
       skipped++;

@@ -12,6 +12,7 @@ type LuckinAccountRow = {
   status: string;
   claimId: string | null;
   assignedAt: string | null;
+  voucherExpiresAt: string | null;
   createdAt: string;
   claim: { claimId: string; status: string; createdAt: string } | null;
 };
@@ -21,6 +22,7 @@ export default function LuckinPoolPage() {
   const [luckinAccountsLoading, setLuckinAccountsLoading] = useState(false);
   const [editingLuckinId, setEditingLuckinId] = useState<number | null>(null);
   const [editLuckinStatus, setEditLuckinStatus] = useState("");
+  const [editLuckinExpiry, setEditLuckinExpiry] = useState("");
   const [savingLuckin, setSavingLuckin] = useState(false);
 
   async function fetchLuckinAccounts() {
@@ -40,6 +42,7 @@ export default function LuckinPoolPage() {
   function startLuckinEdit(row: LuckinAccountRow) {
     setEditingLuckinId(row.id);
     setEditLuckinStatus(row.status);
+    setEditLuckinExpiry(row.voucherExpiresAt ? new Date(row.voucherExpiresAt).toISOString().split('T')[0] : "");
   }
 
   async function saveLuckinEdit(id: number) {
@@ -48,7 +51,7 @@ export default function LuckinPoolPage() {
       const res = await fetch("/api/admin/luckin-accounts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: editLuckinStatus })
+        body: JSON.stringify({ id, status: editLuckinStatus, voucherExpiresAt: editLuckinExpiry || null })
       });
       if (res.ok) {
         toast.success("Updated.");
@@ -160,6 +163,7 @@ export default function LuckinPoolPage() {
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Email</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Password</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+                <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Voucher Expiry</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Claim</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Assigned</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
@@ -167,9 +171,9 @@ export default function LuckinPoolPage() {
             </thead>
             <tbody>
               {luckinAccountsLoading ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
               ) : luckinAccounts.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">No Luckin accounts. Click Refresh to load.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">No Luckin accounts. Click Refresh to load.</td></tr>
               ) : (
                 luckinAccounts.map((row) => (
                   <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
@@ -196,6 +200,20 @@ export default function LuckinPoolPage() {
                             ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                             : "bg-red-500/10 text-red-600 dark:text-red-400"
                         }`}>{row.status}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editingLuckinId === row.id ? (
+                        <input
+                          type="date"
+                          value={editLuckinExpiry}
+                          onChange={(e) => setEditLuckinExpiry(e.target.value)}
+                          className="border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-500">
+                          {row.voucherExpiresAt ? new Date(row.voucherExpiresAt).toLocaleDateString() : "—"}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-500">
