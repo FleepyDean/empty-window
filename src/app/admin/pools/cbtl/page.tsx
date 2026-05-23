@@ -173,7 +173,10 @@ export default function CbtlPoolPage() {
               ) : emailAccounts.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">No email accounts. Click Refresh to load.</td></tr>
               ) : (
-                emailAccounts.map((row) => {
+                [...emailAccounts].sort((a, b) => {
+                  const order = { available: 0, disabled: 1, used: 2 };
+                  return (order[a.status as keyof typeof order] ?? 3) - (order[b.status as keyof typeof order] ?? 3);
+                }).map((row) => {
                   const isExpired = row.voucherExpiresAt && new Date(row.voucherExpiresAt) < new Date();
                   const expiresIn = row.voucherExpiresAt
                     ? Math.ceil((new Date(row.voucherExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
