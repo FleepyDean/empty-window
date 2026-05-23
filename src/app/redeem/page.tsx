@@ -533,7 +533,12 @@ function RedeemPageContent() {
           setExpiresAt(data.expiresAt);
           setTimeLeftMs(data.expiresAt - Date.now());
           setEmailOtp(data.emailOtp ?? null);
-          if (data.status === "waiting_email") {
+          setClaimStartTime(Date.now()); // Set claim start time for restored session
+
+          // Determine phase: if has email but no phone number yet, it's email phase
+          const hasEmail = !!data.emailAddress;
+          const hasPhone = !!data.phoneNumber && data.phoneNumber !== "";
+          if (data.status === "waiting_email" || (hasEmail && !hasPhone)) {
             setClaimState("waiting_email");
           } else {
             setClaimState("waiting_otp");
@@ -636,33 +641,44 @@ function RedeemPageContent() {
     return () => clearInterval(interval);
   }, [orderDetails?.orderId]);
 
-  // Auto-restore successful CBTL claim from order history when page loads
+  // Auto-restore CBTL claim from order history when page loads
   useEffect(() => {
     if (!orderDetails || activeClaim || claimState !== "idle") return;
 
-    // Find the most recent successful CBTL claim with email OTP
-    const successfulCbtlClaim = orderDetails.claims.find(
-      (c) => c.status === "success" && c.productKey === "cbtl" && c.emailAddress
+    // Find the most recent CBTL claim (success or waiting)
+    const cbtlClaim = orderDetails.claims.find(
+      (c) => (c.status === "success" || c.status === "waiting_otp") && c.productKey === "cbtl" && c.emailAddress
     );
 
-    if (successfulCbtlClaim) {
+    if (cbtlClaim) {
       setActiveClaim({
-        claimId: successfulCbtlClaim.claimId,
-        phoneNumber: successfulCbtlClaim.phoneNumber ?? "",
-        emailAddress: successfulCbtlClaim.emailAddress,
-        emailOtp: successfulCbtlClaim.emailOtp ?? null,
-        productName: successfulCbtlClaim.productName,
-        productKey: successfulCbtlClaim.productKey,
-        expiresAt: new Date(successfulCbtlClaim.expiresAt).getTime()
+        claimId: cbtlClaim.claimId,
+        phoneNumber: cbtlClaim.phoneNumber ?? "",
+        emailAddress: cbtlClaim.emailAddress,
+        emailOtp: cbtlClaim.emailOtp ?? null,
+        productName: cbtlClaim.productName,
+        productKey: cbtlClaim.productKey,
+        expiresAt: new Date(cbtlClaim.expiresAt).getTime()
       });
-      setEmailOtp(successfulCbtlClaim.emailOtp ?? null);
-      setOtp(successfulCbtlClaim.otp ?? null);
-      setClaimState("success");
-      setActiveClaimId(successfulCbtlClaim.claimId);
+      setEmailOtp(cbtlClaim.emailOtp ?? null);
+      setOtp(cbtlClaim.otp ?? null);
+
+      // Determine state: if waiting and has email but no phone, it's email phase
+      const hasPhone = !!cbtlClaim.phoneNumber && cbtlClaim.phoneNumber !== "";
+      if (cbtlClaim.status === "waiting_otp" && !hasPhone) {
+        setClaimState("waiting_email");
+        setExpiresAt(new Date(cbtlClaim.expiresAt).getTime());
+        setTimeLeftMs(new Date(cbtlClaim.expiresAt).getTime() - Date.now());
+        setClaimStartTime(Date.now());
+      } else {
+        setClaimState(cbtlClaim.status as ClaimState);
+      }
+
+      setActiveClaimId(cbtlClaim.claimId);
 
       // Also set claimingProduct so the UI shows the product context
       const match = orderDetails.products.find(
-        (p) => p.productKey === successfulCbtlClaim.productKey
+        (p) => p.productKey === cbtlClaim.productKey
       );
       if (match) setClaimingProduct(match);
     }

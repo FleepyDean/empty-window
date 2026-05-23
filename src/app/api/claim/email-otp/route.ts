@@ -124,6 +124,27 @@ export async function POST(request: Request) {
     });
   }
 
+  // CRITICAL: Check if this OTP or messageId was already assigned to another claim
+  // This prevents race conditions where two claims with the same inbox get the same OTP
+  const existingClaimWithOtp = await prisma.claim.findFirst({
+    where: {
+      claimId: { not: claimId },
+      OR: [
+        { emailOtp: result.otp },
+        { emailMessageId: result.messageId }
+      ]
+    }
+  });
+
+  if (existingClaimWithOtp) {
+    console.log(`[IMAP] OTP ${result.otp} already assigned to claim ${existingClaimWithOtp.claimId}, skipping for ${claimId}`);
+    return NextResponse.json({
+      status: "waiting_email_otp",
+      emailAddress: claim.emailAddress,
+      emailOtp: null
+    });
+  }
+
   // For CBTL: mark as success after email OTP (no phone phase)
   const updated = await prisma.claim.update({
     where: { claimId },
