@@ -93,13 +93,7 @@ export async function fetchCbtlOtpForEmail(
       // Walk newest → oldest
       const sorted = [...uidArray].sort((a, b) => b - a);
       const targetTo = toEmail.toLowerCase().trim();
-      // Canonical form strips dots from local part (Gmail ignores dots)
-      const canonicalize = (addr: string) => {
-        const [local, domain] = addr.toLowerCase().split("@");
-        return `${(local ?? "").replace(/\./g, "")}@${domain ?? ""}`;
-      };
-      const targetCanonical = canonicalize(targetTo);
-      console.log(`[IMAP] Target to: ${targetTo} (canonical: ${targetCanonical})`);
+      console.log(`[IMAP] Target to: ${targetTo}`);
 
       for (const uid of sorted) {
         const msg = await client.fetchOne(
@@ -145,14 +139,12 @@ export async function fetchCbtlOtpForEmail(
           continue;
         }
 
-        // Match To: by canonical (dot-stripped) form — CBTL may send to a different
-        // dot variation than what was assigned (e.g. assigned re.dshocker.33 but
-        // CBTL sends to reds.hock.er33). Cross-claim OTP stealing is prevented
-        // separately by scoping excludeMessageIds to the same base inbox.
-        const toCanonicals = toAddrs.map(canonicalize);
-        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")} (canonicals: ${toCanonicals.join(", ")})`);
-        if (!toAddrs.includes(targetTo) && !toCanonicals.includes(targetCanonical)) {
-          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo} (canonical: ${targetCanonical})`);
+        // Match To: by EXACT address only — each claim has a specific dotted email
+        // and should only receive OTPs sent to that exact address.
+        // The excludeMessageIds/excludeOtps logic handles the race condition prevention.
+        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")}, looking for: ${targetTo}`);
+        if (!toAddrs.includes(targetTo)) {
+          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo}`);
           continue;
         }
 
