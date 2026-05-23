@@ -64,7 +64,6 @@ type ActiveClaim = {
 const OTP_POLL_INTERVAL_MS = 5000;
 const CLAIM_DURATION_MS = 15 * 60 * 1000;
 const ACTIVE_CLAIM_ID_KEY = "nishinae.activeClaimId";
-const LAST_ORDER_ID_KEY = "nishinae.lastOrderId";
 
 function RedeemPageContent() {
   const searchParams = useSearchParams();
@@ -184,7 +183,6 @@ function RedeemPageContent() {
       }
 
       const trimmed = orderIdInput.trim();
-      localStorage.setItem(LAST_ORDER_ID_KEY, trimmed);
       // Persist orderId in URL so refresh / in-app browser navigation retains state
       if (urlOrderId !== trimmed) {
         router.replace(`${pathname}?orderId=${encodeURIComponent(trimmed)}`);
@@ -575,10 +573,10 @@ function RedeemPageContent() {
     void restoreSession();
   }, []);
 
-  // Auto-revalidate from URL (preferred) or last-saved localStorage on mount
+  // Auto-revalidate from URL only (no localStorage cache)
   useEffect(() => {
     if (orderDetails) return;
-    const targetId = urlOrderId || localStorage.getItem(LAST_ORDER_ID_KEY) || "";
+    const targetId = urlOrderId || "";
     if (!targetId) return;
     setOrderIdInput(targetId);
     (async () => {
@@ -591,7 +589,6 @@ function RedeemPageContent() {
         const data = (await response.json()) as OrderDetailsResponse;
         if (response.ok && data.valid) {
           setOrderDetails(data);
-          localStorage.setItem(LAST_ORDER_ID_KEY, targetId);
           if (urlOrderId !== targetId) {
             router.replace(`${pathname}?orderId=${encodeURIComponent(targetId)}`);
           }
@@ -602,8 +599,6 @@ function RedeemPageContent() {
             setActiveClaim(null);
             setClaimState("idle");
           }
-        } else if (!urlOrderId) {
-          localStorage.removeItem(LAST_ORDER_ID_KEY);
         }
       } catch {
         // ignore

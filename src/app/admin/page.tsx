@@ -170,11 +170,11 @@ function sanitizeVideoUrl(url: string): string {
 }
 
 const PRODUCT_OPTIONS = [
+  { key: "cbtl", name: "Coffee Bean & Tea Leaf" },
+  { key: "kfc", name: "KFC" },
   { key: "zus", name: "ZUS Coffee" },
   { key: "chagee", name: "Chagee" },
   { key: "tealive", name: "Tealive" },
-  { key: "kfc", name: "KFC" },
-  { key: "cbtl", name: "Coffee Bean & Tea Leaf" },
   { key: "gigi", name: "Gigi Coffee" },
   { key: "luckin", name: "Luckin Coffee" },
   { key: "winrar", name: "WinRAR" },
@@ -188,7 +188,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [ordersLoading, setOrdersLoading] = useState(true);
 
   // Add Order with cart
-  const [newProductKey, setNewProductKey] = useState("zus");
+  const [newProductKey, setNewProductKey] = useState("cbtl");
   const [newQuantity, setNewQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [addingOrder, setAddingOrder] = useState(false);
@@ -214,6 +214,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [editQuantity, setEditQuantity] = useState(1);
   const [savingOrder, setSavingOrder] = useState(false);
   const [ordersPage, setOrdersPage] = useState(1);
+  const [orderSearch, setOrderSearch] = useState("");
   const ORDERS_PER_PAGE = 10;
 
   // Collapsible sections state (minimized by default)
@@ -870,15 +871,31 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <div className="flex items-center justify-between p-4">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
-            <p className="mt-0.5 text-xs text-slate-400">{orders.length} total</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {orderSearch.trim()
+                ? `${orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())).length} of ${orders.length} total`
+                : `${orders.length} total`}
+            </p>
           </div>
-          <button
-            onClick={fetchOrders}
-            disabled={ordersLoading}
-            className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={orderSearch}
+              onChange={(e) => {
+                setOrderSearch(e.target.value);
+                setOrdersPage(1);
+              }}
+              placeholder="Search order ID..."
+              className="w-48 border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+            />
+            <button
+              onClick={fetchOrders}
+              disabled={ordersLoading}
+              className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -903,7 +920,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <td colSpan={7} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
                 </tr>
               ) : (
-                orders.slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
+                (orderSearch.trim()
+                  ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
+                  : orders
+                ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
                   <tr key={order.orderId} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-4 py-2">
                       {editingOrder === order.orderId ? (
@@ -998,55 +1018,61 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </table>
         </div>
         {/* Pagination */}
-        {orders.length > ORDERS_PER_PAGE && (
-          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-            <p className="text-xs text-slate-500">
-              Page {ordersPage} of {Math.ceil(orders.length / ORDERS_PER_PAGE)} · showing {Math.min(ordersPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setOrdersPage(1)}
-                disabled={ordersPage === 1}
-                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-              >«</button>
-              <button
-                onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
-                disabled={ordersPage === 1}
-                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-              >‹ Prev</button>
-              {Array.from({ length: Math.min(5, Math.ceil(orders.length / ORDERS_PER_PAGE)) }, (_, i) => {
-                const total = Math.ceil(orders.length / ORDERS_PER_PAGE);
-                let start = Math.max(1, ordersPage - 2);
-                if (start + 4 > total) start = Math.max(1, total - 4);
-                const page = start + i;
-                if (page > total) return null;
-                return (
-                  <button
-                    key={page}
-                    onClick={() => setOrdersPage(page)}
-                    className={`px-2.5 py-1 text-xs ${
-                      page === ordersPage
-                        ? "bg-cyan-500 font-semibold text-white"
-                        : "text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setOrdersPage((p) => Math.min(Math.ceil(orders.length / ORDERS_PER_PAGE), p + 1))}
-                disabled={ordersPage === Math.ceil(orders.length / ORDERS_PER_PAGE)}
-                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-              >Next ›</button>
-              <button
-                onClick={() => setOrdersPage(Math.ceil(orders.length / ORDERS_PER_PAGE))}
-                disabled={ordersPage === Math.ceil(orders.length / ORDERS_PER_PAGE)}
-                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-              >»</button>
+        {(() => {
+          const filteredOrders = orderSearch.trim()
+            ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
+            : orders;
+          const totalPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
+          if (filteredOrders.length <= ORDERS_PER_PAGE) return null;
+          return (
+            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+              <p className="text-xs text-slate-500">
+                Page {ordersPage} of {totalPages} · showing {Math.min(ordersPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setOrdersPage(1)}
+                  disabled={ordersPage === 1}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >«</button>
+                <button
+                  onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                  disabled={ordersPage === 1}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >‹ Prev</button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let start = Math.max(1, ordersPage - 2);
+                  if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
+                  const page = start + i;
+                  if (page > totalPages) return null;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setOrdersPage(page)}
+                      className={`px-2.5 py-1 text-xs ${
+                        page === ordersPage
+                          ? "bg-cyan-500 font-semibold text-white"
+                          : "text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setOrdersPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={ordersPage === totalPages}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >Next ›</button>
+                <button
+                  onClick={() => setOrdersPage(totalPages)}
+                  disabled={ordersPage === totalPages}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >»</button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Account Pools Link */}

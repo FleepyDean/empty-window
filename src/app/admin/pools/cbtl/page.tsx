@@ -22,6 +22,7 @@ export default function CbtlPoolPage() {
   const [editingEmailId, setEditingEmailId] = useState<number | null>(null);
   const [editEmailExpiry, setEditEmailExpiry] = useState("");
   const [editEmailStatus, setEditEmailStatus] = useState("");
+  const [editField, setEditField] = useState<'status' | 'expiry' | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
 
   async function fetchEmailAccounts() {
@@ -38,13 +39,14 @@ export default function CbtlPoolPage() {
     }
   }
 
-  function startEmailEdit(row: EmailAccountRow) {
+  function startEmailEdit(row: EmailAccountRow, field: 'status' | 'expiry') {
     setEditingEmailId(row.id);
+    setEditField(field);
     setEditEmailStatus(row.status);
     setEditEmailExpiry(row.voucherExpiresAt ? row.voucherExpiresAt.split("T")[0] : "");
   }
 
-  async function saveEmailEdit(id: number) {
+  async function saveEmailEdit(id: number, status?: string, expiry?: string) {
     setSavingEmail(true);
     try {
       const res = await fetch("/api/admin/email-accounts", {
@@ -52,13 +54,12 @@ export default function CbtlPoolPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id,
-          status: editEmailStatus,
-          voucherExpiresAt: editEmailExpiry || null
+          status: status ?? editEmailStatus,
+          voucherExpiresAt: (expiry ?? editEmailExpiry) || null
         })
       });
       if (res.ok) {
         toast.success("Updated.");
-        setEditingEmailId(null);
         await fetchEmailAccounts();
       } else {
         const d = await res.json();
@@ -181,36 +182,51 @@ export default function CbtlPoolPage() {
                     <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
                       <td className="px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">{row.emailAddress}</td>
                       <td className="px-4 py-2">
-                        {editingEmailId === row.id ? (
+                        {editingEmailId === row.id && editField === 'status' ? (
                           <select
                             value={editEmailStatus}
-                            onChange={(e) => setEditEmailStatus(e.target.value)}
+                            onChange={(e) => {
+                              setEditEmailStatus(e.target.value);
+                              saveEmailEdit(row.id, e.target.value, editEmailExpiry);
+                            }}
+                            onBlur={() => setEditingEmailId(null)}
                             className="border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
+                            autoFocus
                           >
                             <option value="available">available</option>
                             <option value="used">used</option>
                             <option value="disabled">disabled</option>
                           </select>
                         ) : (
-                          <span className={`inline-block px-1.5 py-0.5 text-xs ${
-                            row.status === "available"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : row.status === "used"
-                              ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                              : "bg-red-500/10 text-red-600 dark:text-red-400"
-                          }`}>{row.status}</span>
+                          <span
+                            onClick={() => startEmailEdit(row, 'status')}
+                            className={`inline-block cursor-pointer px-1.5 py-0.5 text-xs hover:opacity-80 ${
+                              row.status === "available"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : row.status === "used"
+                                ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                : "bg-red-500/10 text-red-600 dark:text-red-400"
+                            }`}>{row.status}</span>
                         )}
                       </td>
                       <td className="px-4 py-2">
-                        {editingEmailId === row.id ? (
+                        {editingEmailId === row.id && editField === 'expiry' ? (
                           <input
                             type="date"
                             value={editEmailExpiry}
-                            onChange={(e) => setEditEmailExpiry(e.target.value)}
+                            onChange={(e) => {
+                              setEditEmailExpiry(e.target.value);
+                              saveEmailEdit(row.id, editEmailStatus, e.target.value);
+                            }}
+                            onBlur={() => setEditingEmailId(null)}
                             className="border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
+                            autoFocus
                           />
                         ) : row.voucherExpiresAt ? (
-                          <span className={`text-xs ${isExpired ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`}>
+                          <span
+                            onClick={() => startEmailEdit(row, 'expiry')}
+                            className={`cursor-pointer text-xs hover:opacity-80 ${isExpired ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`}
+                          >
                             {new Date(row.voucherExpiresAt).toLocaleDateString()}
                             {expiresIn !== null && (
                               <span className={isExpired ? "text-red-500" : "text-emerald-600 dark:text-emerald-400"}>
@@ -219,7 +235,10 @@ export default function CbtlPoolPage() {
                             )}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span
+                            onClick={() => startEmailEdit(row, 'expiry')}
+                            className="cursor-pointer text-xs text-slate-400 hover:text-slate-600"
+                          >—</span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-xs text-slate-500">
@@ -240,38 +259,12 @@ export default function CbtlPoolPage() {
                         {row.assignedAt ? new Date(row.assignedAt).toLocaleDateString() : "—"}
                       </td>
                       <td className="px-4 py-2">
-                        {editingEmailId === row.id ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => saveEmailEdit(row.id)}
-                              disabled={savingEmail}
-                              className="text-xs font-medium text-emerald-600 hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
-                            >
-                              {savingEmail ? "Saving..." : "Save"}
-                            </button>
-                            <button
-                              onClick={() => setEditingEmailId(null)}
-                              className="text-xs text-slate-500 hover:text-slate-400"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => startEmailEdit(row)}
-                              className="text-xs text-cyan-600 hover:text-cyan-500 dark:text-cyan-400"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteEmailAccount(row.id, row.emailAddress)}
-                              className="text-xs text-red-500 hover:text-red-400"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
+                        <button
+                          onClick={() => deleteEmailAccount(row.id, row.emailAddress)}
+                          className="text-xs text-red-500 hover:text-red-400"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   );
