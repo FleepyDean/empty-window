@@ -878,16 +878,30 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={orderSearch}
-              onChange={(e) => {
-                setOrderSearch(e.target.value);
-                setOrdersPage(1);
-              }}
-              placeholder="Search order ID..."
-              className="w-48 border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={orderSearch}
+                onChange={(e) => {
+                  setOrderSearch(e.target.value);
+                  setOrdersPage(1);
+                }}
+                placeholder="Search order ID..."
+                className="w-48 border border-slate-300 bg-white pr-7 pl-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              />
+              {orderSearch && (
+                <button
+                  onClick={() => {
+                    setOrderSearch("");
+                    setOrdersPage(1);
+                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  aria-label="Clear search"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              )}
+            </div>
             <button
               onClick={fetchOrders}
               disabled={ordersLoading}
