@@ -23,7 +23,6 @@ export default function CbtlPoolPage() {
   const [editEmailExpiry, setEditEmailExpiry] = useState("");
   const [editEmailStatus, setEditEmailStatus] = useState("");
   const [editField, setEditField] = useState<'status' | 'expiry' | null>(null);
-  const [savingEmail, setSavingEmail] = useState(false);
 
   async function fetchEmailAccounts() {
     setEmailAccountsLoading(true);
@@ -47,28 +46,34 @@ export default function CbtlPoolPage() {
   }
 
   async function saveEmailEdit(id: number, status?: string, expiry?: string) {
-    setSavingEmail(true);
+    const resolvedStatus = status ?? editEmailStatus;
+    const resolvedExpiry = (expiry ?? editEmailExpiry) || null;
+    // Optimistic update — patch local state immediately, no refetch
+    setEmailAccounts((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? { ...a, status: resolvedStatus, voucherExpiresAt: resolvedExpiry }
+          : a
+      )
+    );
+    setEditingEmailId(null);
     try {
       const res = await fetch("/api/admin/email-accounts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          status: status ?? editEmailStatus,
-          voucherExpiresAt: (expiry ?? editEmailExpiry) || null
-        })
+        body: JSON.stringify({ id, status: resolvedStatus, voucherExpiresAt: resolvedExpiry })
       });
       if (res.ok) {
         toast.success("Updated.");
-        await fetchEmailAccounts();
       } else {
         const d = await res.json();
         toast.error(d.message ?? "Failed to update.");
+        // Revert by refetching only on failure
+        await fetchEmailAccounts();
       }
     } catch {
       toast.error("Failed to update.");
-    } finally {
-      setSavingEmail(false);
+      await fetchEmailAccounts();
     }
   }
 
@@ -238,10 +243,14 @@ export default function CbtlPoolPage() {
                             )}
                           </span>
                         ) : (
-                          <span
+                          <input
+                            type="date"
+                            onFocus={() => startEmailEdit(row, 'expiry')}
                             onClick={() => startEmailEdit(row, 'expiry')}
-                            className="cursor-pointer text-xs text-slate-400 hover:text-slate-600"
-                          >—</span>
+                            readOnly
+                            placeholder="Set expiry"
+                            className="w-32 cursor-pointer border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-400 hover:border-slate-400 dark:border-slate-700 dark:text-slate-500 dark:hover:border-slate-500"
+                          />
                         )}
                       </td>
                       <td className="px-4 py-2 text-xs text-slate-500">
