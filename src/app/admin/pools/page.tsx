@@ -25,6 +25,20 @@ export default function PoolsPage() {
 
       {/* Pool Cards */}
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        {/* Generate CBTL Account */}
+        <Link
+          href="/admin/cbtl-register"
+          className="group col-span-full border border-emerald-200 bg-emerald-50/50 p-6 transition hover:border-emerald-500 hover:shadow-sm dark:border-emerald-900 dark:bg-emerald-950/20 dark:hover:border-emerald-400"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-emerald-800 dark:text-emerald-300">Generate CBTL Account</h2>
+            <span className="text-emerald-600 transition group-hover:translate-x-1 dark:text-emerald-400">→</span>
+          </div>
+          <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-500">
+            Register new CBTL accounts using HeroSMS — assign phone number, receive OTP, set available with 14-day expiry
+          </p>
+          <p className="mt-4 text-xs text-emerald-500">Click to start registering →</p>
+        </Link>
         {/* CBTL Email Pool */}
         <Link
           href="/admin/pools/cbtl"
