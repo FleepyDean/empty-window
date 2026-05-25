@@ -397,7 +397,10 @@ export default function CbtlRegisterPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-sm text-slate-800 dark:text-white">{activeEmail.emailAddress}</span>
                   <button
-                    onClick={() => copy(activeEmail.emailAddress, "email")}
+                    onClick={() => {
+                      copy(activeEmail.emailAddress, "email");
+                      if (emailOtpStatus === "idle") startEmailPolling(activeEmail.emailAddress);
+                    }}
                     className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
                   >
                     Copy
