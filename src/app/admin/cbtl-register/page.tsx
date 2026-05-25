@@ -29,8 +29,29 @@ type AccountEntry = {
 
 const SERVICE = "ot"; // "Any other" service on HeroSMS
 const POLL_INTERVAL_MS = 4000;
-const MAX_POLL_SECONDS = 90;
 const EMAIL_OTP_POLL_INTERVAL_MS = 5000;
+const SS_KEY = "cbtl_register_session";
+
+type PersistedSession = {
+  activeEmailId: number;
+  activeEmailAddress: string;
+  sms: { activationId: string; phoneNumber: string; otp: string | null; status: string } | null;
+  smsRequestedAt: number | null;
+  emailOtp: string | null;
+  emailOtpStatus: string;
+  emailPollingSince: string | null;
+};
+
+function saveSession(data: Partial<PersistedSession>) {
+  try {
+    const existing = JSON.parse(sessionStorage.getItem(SS_KEY) ?? "null") ?? {};
+    sessionStorage.setItem(SS_KEY, JSON.stringify({ ...existing, ...data }));
+  } catch { /* ignore */ }
+}
+
+function clearSession() {
+  try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ }
+}
 
 export default function CbtlRegisterPage() {
   const [balance, setBalance] = useState<string | null>(null);
@@ -43,6 +64,7 @@ export default function CbtlRegisterPage() {
   const [sms, setSms] = useState<SmsSession | null>(null);
   const [smsLoading, setSmsLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [smsRequestedAt, setSmsRequestedAt] = useState<number | null>(null);
 
   const [emailOtp, setEmailOtp] = useState<string | null>(null);
   const [emailOtpStatus, setEmailOtpStatus] = useState<"idle" | "polling" | "success">("idle");
@@ -93,6 +115,66 @@ export default function CbtlRegisterPage() {
   useEffect(() => {
     fetchBalance();
     fetchEmails();
+
+    // Restore persisted session
+    try {
+      const raw = sessionStorage.getItem(SS_KEY);
+      if (raw) {
+        const s: PersistedSession = JSON.parse(raw);
+        if (s.activeEmailId) setActiveEmailId(s.activeEmailId);
+        if (s.emailOtp) { setEmailOtp(s.emailOtp); setEmailOtpStatus("success"); }
+        else if (s.emailOtpStatus === "polling" && s.emailPollingSince && s.activeEmailAddress) {
+          setEmailOtpStatus("polling");
+          // resume email polling from original since timestamp
+          const since = new Date(s.emailPollingSince);
+          emailPollRef.current = setInterval(async () => {
+            try {
+              const res = await fetch(
+                `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(s.activeEmailAddress)}&since=${encodeURIComponent(since.toISOString())}`
+              );
+              const d = await res.json();
+              if (d.status === "success" && d.otp) {
+                stopEmailPolling();
+                setEmailOtp(d.otp);
+                setEmailOtpStatus("success");
+                saveSession({ emailOtp: d.otp, emailOtpStatus: "success" });
+                toast.success(`Email OTP received: ${d.otp}`);
+              }
+            } catch { /* ignore */ }
+          }, EMAIL_OTP_POLL_INTERVAL_MS);
+        }
+        if (s.sms && s.sms.status === "waiting") {
+          const smsData = { ...s.sms, status: "waiting" as const };
+          setSms(smsData);
+          setSmsRequestedAt(s.smsRequestedAt);
+          if (s.smsRequestedAt) {
+            setElapsed(Math.floor((Date.now() - s.smsRequestedAt) / 1000));
+          }
+          elapsedRef.current = setInterval(() => setElapsed((p) => p + 1), 1000);
+          pollRef.current = setInterval(async () => {
+            try {
+              const res = await fetch(`/api/admin/cbtl-register/sms?id=${s.sms!.activationId}`);
+              const d = await res.json();
+              if (d.status === "success" && d.otp) {
+                stopPolling();
+                setSms((prev) => prev ? { ...prev, otp: d.otp, status: "success" } : prev);
+                saveSession({ sms: { ...s.sms!, otp: d.otp, status: "success" } });
+                toast.success(`OTP received: ${d.otp}`);
+              } else if (d.status === "cancelled") {
+                stopPolling();
+                setSms((prev) => prev ? { ...prev, status: "cancelled" } : prev);
+                saveSession({ sms: { ...s.sms!, status: "cancelled" } });
+                toast.error("Number was cancelled externally.");
+              }
+            } catch { /* ignore */ }
+          }, POLL_INTERVAL_MS);
+          toast.info("Resumed session from before refresh.");
+        } else if (s.sms) {
+          setSms(s.sms as SmsSession);
+          setSmsRequestedAt(s.smsRequestedAt);
+        }
+      }
+    } catch { /* ignore */ }
   }, []);
 
   // ── SMS polling ────────────────────────────────────────────────────────────
@@ -114,6 +196,7 @@ export default function CbtlRegisterPage() {
     const since = new Date();
     setEmailOtp(null);
     setEmailOtpStatus("polling");
+    saveSession({ emailOtpStatus: "polling", emailPollingSince: since.toISOString(), activeEmailAddress: email, emailOtp: null });
 
     emailPollRef.current = setInterval(async () => {
       try {
@@ -125,6 +208,7 @@ export default function CbtlRegisterPage() {
           stopEmailPolling();
           setEmailOtp(d.otp);
           setEmailOtpStatus("success");
+          saveSession({ emailOtp: d.otp, emailOtpStatus: "success" });
           toast.success(`Email OTP received: ${d.otp}`);
         }
       } catch {
@@ -142,26 +226,22 @@ export default function CbtlRegisterPage() {
     }, 1000);
 
     pollRef.current = setInterval(async () => {
-      setElapsed((prev) => {
-        if (prev >= MAX_POLL_SECONDS) {
-          stopPolling();
-          toast.error("OTP timeout — number cancelled.");
-          cancelCurrentNumber(activationId);
-          return prev;
-        }
-        return prev;
-      });
-
       try {
         const res = await fetch(`/api/admin/cbtl-register/sms?id=${activationId}`);
         const d = await res.json();
         if (d.status === "success" && d.otp) {
           stopPolling();
-          setSms((prev) => prev ? { ...prev, otp: d.otp, status: "success" } : prev);
+          setSms((prev) => {
+            if (prev) { saveSession({ sms: { ...prev, otp: d.otp, status: "success" } }); }
+            return prev ? { ...prev, otp: d.otp, status: "success" } : prev;
+          });
           toast.success(`OTP received: ${d.otp}`);
         } else if (d.status === "cancelled") {
           stopPolling();
-          setSms((prev) => prev ? { ...prev, status: "cancelled" } : prev);
+          setSms((prev) => {
+            if (prev) { saveSession({ sms: { ...prev, status: "cancelled" } }); }
+            return prev ? { ...prev, status: "cancelled" } : prev;
+          });
           toast.error("Number was cancelled externally.");
         }
       } catch {
@@ -181,6 +261,7 @@ export default function CbtlRegisterPage() {
       // best-effort
     }
     setSms(null);
+    saveSession({ sms: null, smsRequestedAt: null });
   }
 
   useEffect(() => () => { stopPolling(); stopEmailPolling(); }, []);
@@ -203,8 +284,12 @@ export default function CbtlRegisterPage() {
       });
       const d = await res.json();
       if (res.ok) {
-        setSms({ activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" });
+        const newSms = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" as const };
+        const requestedAt = Date.now();
+        setSms(newSms);
         setElapsed(0);
+        setSmsRequestedAt(requestedAt);
+        saveSession({ sms: newSms, smsRequestedAt: requestedAt });
         startPolling(d.activationId);
         toast.success(`Number assigned: ${d.phoneNumber}`);
       } else {
@@ -217,19 +302,22 @@ export default function CbtlRegisterPage() {
     }
   }
 
+  const CANCEL_LOCK_SECONDS = 120;
+
   async function cancelNumber() {
     if (!sms) return;
+    if (smsRequestedAt) {
+      const secondsSince = Math.floor((Date.now() - smsRequestedAt) / 1000);
+      if (secondsSince < CANCEL_LOCK_SECONDS) {
+        toast.error(`HeroSMS blocks cancellation within 2 minutes. Wait ${CANCEL_LOCK_SECONDS - secondsSince}s more.`);
+        return;
+      }
+    }
     stopPolling();
     await cancelCurrentNumber(sms.activationId);
+    setSmsRequestedAt(null);
+    saveSession({ sms: null, smsRequestedAt: null });
     toast.success("Number cancelled.");
-  }
-
-  function startEmailOtpPolling() {
-    if (!activeEmailId) { toast.error("Select an email first."); return; }
-    const email = emails.find((e) => e.id === activeEmailId);
-    if (!email) return;
-    startEmailPolling(email.emailAddress);
-    toast.success("Polling inbox for email OTP...");
   }
 
   async function markDone() {
@@ -270,6 +358,7 @@ export default function CbtlRegisterPage() {
         setEmailOtp(null);
         setEmailOtpStatus("idle");
         setActiveEmailId(null);
+        clearSession();
         toast.success("Account activated! Status set to available, expiry +14 days.");
       } else {
         const d = await res.json();
@@ -300,6 +389,7 @@ export default function CbtlRegisterPage() {
     stopEmailPolling();
     setEmailOtp(null);
     setEmailOtpStatus("idle");
+    clearSession();
   }
 
   return (
@@ -399,7 +489,8 @@ export default function CbtlRegisterPage() {
                   <button
                     onClick={() => {
                       copy(activeEmail.emailAddress, "email");
-                      if (emailOtpStatus === "idle") startEmailPolling(activeEmail.emailAddress);
+                      startEmailPolling(activeEmail.emailAddress);
+                      requestNumber();
                     }}
                     className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
                   >
@@ -435,16 +526,9 @@ export default function CbtlRegisterPage() {
                 <p className="mb-3 text-xs text-slate-400">
                   {emailOtpStatus === "polling"
                     ? `Checking inbox for email to ${activeEmail?.emailAddress ?? "..."}`
-                    : "Not started — click below after submitting phone OTP in the CBTL app"}
+                    : "Not started"}
                 </p>
               )}
-              <button
-                onClick={startEmailOtpPolling}
-                disabled={!activeEmailId || emailOtpStatus === "polling" || emailOtpStatus === "success"}
-                className="mt-1 w-full border border-violet-400 py-2 text-xs font-semibold text-violet-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-violet-500 dark:text-violet-400 dark:hover:bg-violet-950"
-              >
-                {emailOtpStatus === "polling" ? "Polling inbox..." : emailOtpStatus === "success" ? "✓ Email OTP received" : "Start Polling Email OTP"}
-              </button>
             </div>
 
             {/* Phone number */}
@@ -452,9 +536,7 @@ export default function CbtlRegisterPage() {
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone Number</p>
                 {sms?.status === "waiting" && (
-                  <span className="text-xs text-slate-400">
-                    {elapsed}s / {MAX_POLL_SECONDS}s
-                  </span>
+                  <span className="text-xs text-slate-400">{elapsed}s</span>
                 )}
               </div>
 
@@ -462,10 +544,10 @@ export default function CbtlRegisterPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-bold text-slate-800 dark:text-white">
-                      {sms.phoneNumber}
+                      {sms.phoneNumber.replace(/^6/, "")}
                     </span>
                     <button
-                      onClick={() => copy(sms.phoneNumber, "phone number")}
+                      onClick={() => copy(sms.phoneNumber.replace(/^6/, ""), "phone number")}
                       className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
                     >
                       Copy
@@ -483,9 +565,11 @@ export default function CbtlRegisterPage() {
                     </span>
                     <button
                       onClick={cancelNumber}
-                      className="text-xs text-red-500 hover:text-red-400"
+                      className="text-xs text-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      Cancel & get new number
+                      {smsRequestedAt && elapsed < CANCEL_LOCK_SECONDS
+                        ? `Cancel (locked ${CANCEL_LOCK_SECONDS - elapsed}s)`
+                        : "Cancel number"}
                     </button>
                   </div>
                 </div>
@@ -493,13 +577,15 @@ export default function CbtlRegisterPage() {
                 <p className="text-xs text-slate-400">No number assigned yet.</p>
               )}
 
-              <button
-                onClick={requestNumber}
-                disabled={!activeEmailId || smsLoading}
-                className="mt-3 w-full border border-cyan-500 py-2 text-xs font-semibold text-cyan-600 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-cyan-400 dark:text-cyan-400 dark:hover:bg-cyan-950"
-              >
-                {smsLoading ? "Requesting..." : sms ? "Request New Number" : "Get Phone Number"}
-              </button>
+              {(!sms || sms.status !== "waiting") && (
+                <button
+                  onClick={requestNumber}
+                  disabled={!activeEmailId || smsLoading}
+                  className="mt-3 w-full border border-cyan-500 py-2 text-xs font-semibold text-cyan-600 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-cyan-400 dark:text-cyan-400 dark:hover:bg-cyan-950"
+                >
+                  {smsLoading ? "Requesting..." : sms ? "Request New Number" : "Get Phone Number"}
+                </button>
+              )}
             </div>
 
             {/* SMS OTP */}
