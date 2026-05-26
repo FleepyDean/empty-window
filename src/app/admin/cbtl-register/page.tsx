@@ -29,7 +29,7 @@ type AccountEntry = {
 
 const SERVICE = "ot"; // "Any other" service on HeroSMS
 const POLL_INTERVAL_MS = 4000;
-const EMAIL_OTP_POLL_INTERVAL_MS = 5000;
+const EMAIL_OTP_POLL_INTERVAL_MS = 3000;
 const SS_KEY = "cbtl_register_session";
 
 type PersistedSession = {
@@ -198,7 +198,7 @@ export default function CbtlRegisterPage() {
     setEmailOtpStatus("polling");
     saveSession({ emailOtpStatus: "polling", emailPollingSince: since.toISOString(), activeEmailAddress: email, emailOtp: null });
 
-    emailPollRef.current = setInterval(async () => {
+    const pollOnce = async () => {
       try {
         const res = await fetch(
           `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(email)}&since=${encodeURIComponent(since.toISOString())}`
@@ -214,7 +214,11 @@ export default function CbtlRegisterPage() {
       } catch {
         // ignore transient errors
       }
-    }, EMAIL_OTP_POLL_INTERVAL_MS);
+    };
+
+    // Fire immediately, then every 3s
+    pollOnce();
+    emailPollRef.current = setInterval(pollOnce, EMAIL_OTP_POLL_INTERVAL_MS);
   }
 
   function startPolling(activationId: string) {
