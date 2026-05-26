@@ -186,13 +186,16 @@ export default function CbtlRegisterPage() {
     setEmailOtpStatus("polling");
     saveSession({ emailOtpStatus: "polling", emailPollingSince: since.toISOString(), activeEmailAddress: email, emailOtp: null });
 
+    let found = false;
     const poll = setInterval(async () => {
+      if (found) return;
       try {
         const url = `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(email)}&since=${encodeURIComponent(since.toISOString())}`;
         const res = await fetch(url);
         if (!res.ok) return;
         const d = await res.json();
-        if (d.status === "success" && d.otp) {
+        if (d.status === "success" && d.otp && !found) {
+          found = true;
           stopEmailPolling();
           setEmailOtp(d.otp);
           setEmailOtpStatus("success");
