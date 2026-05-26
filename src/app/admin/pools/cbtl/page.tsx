@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme";
@@ -23,6 +23,12 @@ export default function CbtlPoolPage() {
   const [editEmailExpiry, setEditEmailExpiry] = useState("");
   const [editEmailStatus, setEditEmailStatus] = useState("");
   const [editField, setEditField] = useState<'status' | 'expiry' | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const lastClickedIdx = useRef<number | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newEmails, setNewEmails] = useState("");
+  const [adding, setAdding] = useState(false);
 
   async function fetchEmailAccounts() {
     setEmailAccountsLoading(true);
@@ -97,6 +103,63 @@ export default function CbtlPoolPage() {
     }
   }
 
+  function toggleSelect(id: number, e: React.MouseEvent) {
+    const sortedAccounts = [...emailAccounts].sort((a, b) => {
+      const order = { available: 0, disabled: 1, used: 2 };
+      return (order[a.status as keyof typeof order] ?? 3) - (order[b.status as keyof typeof order] ?? 3);
+    });
+    const currentIdx = sortedAccounts.findIndex((a) => a.id === id);
+
+    if (e.shiftKey && lastClickedIdx.current !== null && lastClickedIdx.current !== currentIdx) {
+      const start = Math.min(lastClickedIdx.current, currentIdx);
+      const end = Math.max(lastClickedIdx.current, currentIdx);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          next.add(sortedAccounts[i].id);
+        }
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
+    lastClickedIdx.current = currentIdx;
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === emailAccounts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(emailAccounts.map((a) => a.id)));
+    }
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected email account(s)?`)) return;
+    setBulkDeleting(true);
+    let deleted = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch("/api/admin/email-accounts", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id })
+        });
+        if (res.ok) deleted++;
+      } catch { /* ignore */ }
+    }
+    toast.success(`Deleted ${deleted} of ${selectedIds.size} accounts.`);
+    setSelectedIds(new Set());
+    setBulkDeleting(false);
+    await fetchEmailAccounts();
+  }
+
   useEffect(() => {
     fetchEmailAccounts();
   }, []);
@@ -146,6 +209,58 @@ export default function CbtlPoolPage() {
         </div>
       </div>
 
+      {/* Add Emails */}
+      <div className="mt-4">
+        <button
+          onClick={() => setShowAddForm((v) => !v)}
+          className="text-xs font-medium text-violet-600 hover:underline dark:text-violet-400"
+        >
+          {showAddForm ? "Hide" : "+ Add Emails"}
+        </button>
+        {showAddForm && (
+          <div className="mt-2 border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <p className="mb-2 text-xs text-slate-500">Paste emails (one per line). They will be added as <strong>disabled</strong>.</p>
+            <textarea
+              value={newEmails}
+              onChange={(e) => setNewEmails(e.target.value)}
+              rows={5}
+              className="w-full border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            />
+            <button
+              onClick={async () => {
+                const emails = newEmails.split("\n").map((l) => l.trim()).filter(Boolean);
+                if (emails.length === 0) { toast.error("Enter at least one email."); return; }
+                setAdding(true);
+                try {
+                  const res = await fetch("/api/admin/email-accounts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ emails })
+                  });
+                  const d = await res.json();
+                  if (res.ok) {
+                    toast.success(`Added ${d.count} email(s).`);
+                    setNewEmails("");
+                    setShowAddForm(false);
+                    await fetchEmailAccounts();
+                  } else {
+                    toast.error(d.message ?? "Failed to add.");
+                  }
+                } catch {
+                  toast.error("Failed to add.");
+                } finally {
+                  setAdding(false);
+                }
+              }}
+              disabled={adding}
+              className="mt-2 border border-violet-400 px-4 py-1.5 text-xs font-semibold text-violet-600 transition hover:bg-violet-50 disabled:opacity-40 dark:border-violet-500 dark:text-violet-400 dark:hover:bg-violet-950"
+            >
+              {adding ? "Adding..." : "Add Emails"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="mt-4 flex items-center justify-between">
         <button
@@ -155,6 +270,15 @@ export default function CbtlPoolPage() {
         >
           {emailAccountsLoading ? "Loading..." : "Refresh"}
         </button>
+        {selectedIds.size > 0 && (
+          <button
+            onClick={bulkDelete}
+            disabled={bulkDeleting}
+            className="border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 disabled:opacity-40 dark:border-red-700 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+          >
+            {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -163,6 +287,14 @@ export default function CbtlPoolPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
               <tr>
+                <th className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={emailAccounts.length > 0 && selectedIds.size === emailAccounts.length}
+                    onChange={toggleSelectAll}
+                    className="h-3.5 w-3.5 cursor-pointer accent-red-500"
+                  />
+                </th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Email</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Voucher Expiry</th>
@@ -174,9 +306,9 @@ export default function CbtlPoolPage() {
             </thead>
             <tbody>
               {emailAccountsLoading ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
               ) : emailAccounts.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">No email accounts. Click Refresh to load.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-500">No email accounts. Click Refresh to load.</td></tr>
               ) : (
                 [...emailAccounts].sort((a, b) => {
                   const order = { available: 0, disabled: 1, used: 2 };
@@ -188,6 +320,15 @@ export default function CbtlPoolPage() {
                     : null;
                   return (
                     <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onClick={(e) => toggleSelect(row.id, e)}
+                          onChange={() => {}}
+                          className="h-3.5 w-3.5 cursor-pointer accent-red-500"
+                        />
+                      </td>
                       <td className="px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">{row.emailAddress}</td>
                       <td className="px-4 py-2">
                         {editingEmailId === row.id && editField === 'status' ? (

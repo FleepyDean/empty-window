@@ -139,21 +139,25 @@ export async function fetchCbtlOtpForEmail(
           continue;
         }
 
-        // Match To: by EXACT address only — each claim has a specific dotted email
-        // and should only receive OTPs sent to that exact address.
-        // The excludeMessageIds/excludeOtps logic handles the race condition prevention.
-        console.log(`[IMAP] To addresses: ${toAddrs.join(", ")}, looking for: ${targetTo}`);
-        if (!toAddrs.includes(targetTo)) {
-          console.log(`[IMAP] Skipping: to address doesn't match ${targetTo}`);
-          continue;
-        }
-
-        // Parse email properly (decode quoted-printable / base64 / HTML)
+        // Parse email to get raw headers (envelope may normalize dots in Gmail)
         if (!msg.source) {
           console.log(`[IMAP] Skipping: no source for uid ${uid}`);
           continue;
         }
         const parsed = await simpleParser(msg.source);
+
+        // Match To: by EXACT address only — use parsed headers which preserve original dots
+        const parsedToAddrs = (parsed.to
+          ? (Array.isArray(parsed.to) ? parsed.to : [parsed.to])
+              .flatMap((t) => ("value" in t ? t.value : [t]))
+              .map((a) => (a.address ?? "").toLowerCase())
+          : toAddrs
+        );
+        console.log(`[IMAP] To addresses (envelope): ${toAddrs.join(", ")}, (parsed): ${parsedToAddrs.join(", ")}, looking for: ${targetTo}`);
+        if (!parsedToAddrs.includes(targetTo)) {
+          console.log(`[IMAP] Skipping: parsed to address doesn't match ${targetTo}`);
+          continue;
+        }
         const textBody = (parsed.text ?? "").trim();
         const htmlBody = typeof parsed.html === "string" ? parsed.html : "";
         const decodedHtmlText = htmlBody.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");

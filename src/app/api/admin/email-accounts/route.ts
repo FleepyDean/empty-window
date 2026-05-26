@@ -39,6 +39,25 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ account: updated });
 }
 
+export async function POST(request: Request) {
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
+  const { emails } = await request.json();
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    return NextResponse.json({ message: "emails array is required" }, { status: 400 });
+  }
+
+  const created = await prisma.emailAccount.createMany({
+    data: emails.map((email: string) => ({
+      emailAddress: email.trim().toLowerCase(),
+      status: "disabled"
+    })),
+    skipDuplicates: true
+  });
+
+  return NextResponse.json({ count: created.count });
+}
+
 export async function DELETE(request: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 

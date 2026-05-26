@@ -70,17 +70,7 @@ export default function PoolsPage() {
         </Link>
       </div>
 
-      {/* Import Instructions */}
-      <div className="mt-8 border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Bulk Import</h3>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Use the import scripts to add accounts in bulk:
-        </p>
-        <div className="mt-3 space-y-1 font-mono text-xs text-slate-600 dark:text-slate-400">
-          <p>node scripts/import-emails.mjs emails.csv</p>
-          <p>node scripts/import-luckin-accounts.mjs accounts.csv</p>
-        </div>
-      </div>
+      
     </main>
   );
 }
