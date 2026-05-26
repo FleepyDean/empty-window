@@ -11,7 +11,7 @@ const IMAP_PORT = Number(process.env.GMAIL_IMAP_PORT ?? 993);
 const IMAP_USER = process.env.GMAIL_BASE_EMAIL ?? "";
 const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 const CBTL_FROM_EXACT = "no-reply@my.thecoffeebeanandtealeaf.com";
-const POLL_INTERVAL_MS = 1500;
+const POLL_INTERVAL_MS = 1000;
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 // ── Singleton IMAP client ─────────────────────────────────────────────────────
@@ -102,25 +102,27 @@ export async function GET(request: Request) {
       searchSince.setDate(searchSince.getDate() - 1);
       const seenUids = new Set<number>();
 
+      async function searchUids(): Promise<number[]> {
+        try {
+          return await client.search(
+            { raw: `to:(${targetTo}) from:(${CBTL_FROM_EXACT})`, since: searchSince } as never,
+            { uid: true }
+          ) as unknown as number[];
+        } catch {
+          return await client.search(
+            { from: CBTL_FROM_EXACT, since: searchSince } as never,
+            { uid: true }
+          ) as unknown as number[];
+        }
+      }
+
       async function pollOnce(): Promise<string | null> {
         let lock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>> | undefined;
         const tStart = Date.now();
         try {
           lock = await client.getMailboxLock("INBOX");
           const tLock = Date.now();
-
-          let uids: number[] = [];
-          try {
-            uids = await client.search(
-              { raw: `to:(${targetTo}) from:(${CBTL_FROM_EXACT})`, since: searchSince } as never,
-              { uid: true }
-            ) as unknown as number[];
-          } catch {
-            uids = await client.search(
-              { from: CBTL_FROM_EXACT, since: searchSince } as never,
-              { uid: true }
-            ) as unknown as number[];
-          }
+          const uids = await searchUids();
           const tSearch = Date.now();
 
           const arr = Array.isArray(uids) ? uids : [];
@@ -133,42 +135,35 @@ export async function GET(request: Request) {
             return null;
           }
 
-          // Batch headers fetch — ONE IMAP command for all candidates instead of N round-trips
-          const candidates = newUids.sort((a, b) => b - a).slice(0, 10);
-          const matches: number[] = [];
-          const tHdrStart = Date.now();
+          // Combined fetch: source includes raw headers — saves a separate headers round-trip
+          const candidates = newUids.sort((a, b) => b - a).slice(0, 5);
+          const tFetchStart = Date.now();
+          let foundOtp: string | null = null;
           for await (const msg of client.fetch(
             candidates.join(","),
-            { headers: ["from", "to", "date"], internalDate: true },
+            { source: true, internalDate: true },
             { uid: true }
           )) {
             if (!msg) continue;
             const emailDate = msg.internalDate ?? null;
             if (!emailDate || emailDate < since) continue;
-            const hdrs = msg.headers as Buffer | undefined;
-            if (!hdrs) continue;
-            if (extractRawFromHeader(hdrs) !== CBTL_FROM_EXACT) continue;
-            const toAddrs = extractRawToHeader(hdrs);
+            const src = (msg as { source?: Buffer }).source;
+            if (!src) continue;
+            if (extractRawFromHeader(src) !== CBTL_FROM_EXACT) continue;
+            const toAddrs = extractRawToHeader(src);
             if (!toAddrs.includes(targetTo)) continue;
-            matches.push(msg.uid);
-          }
-          const tHdrEnd = Date.now();
-          console.log(`[OTP] poll: lock=${tLock - tStart}ms search=${tSearch - tLock}ms headers=${tHdrEnd - tHdrStart}ms (${candidates.length} cand, ${matches.length} match)`);
-
-          for (const uid of matches.sort((a, b) => b - a)) {
-            const tBody = Date.now();
-            const srcMsg = await client.fetchOne(String(uid), { source: true }, { uid: true });
-            if (!srcMsg || !(srcMsg as { source?: Buffer }).source) continue;
-            const parsed = await simpleParser((srcMsg as { source: Buffer }).source);
+            const parsed = await simpleParser(src);
             const text = (parsed.text ?? "").trim();
             const html = typeof parsed.html === "string" ? parsed.html : "";
             const body = text || html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
             const otp = extractCbtlOtp(body);
-            console.log(`[OTP] body uid=${uid}: ${Date.now() - tBody}ms otp=${otp ?? "none"}`);
-            if (otp) { lock.release(); return otp; }
+            if (otp) { foundOtp = otp; break; }
           }
+          const tFetchEnd = Date.now();
+          console.log(`[OTP] poll: lock=${tLock - tStart}ms search=${tSearch - tLock}ms fetch=${tFetchEnd - tFetchStart}ms (${candidates.length} new) otp=${foundOtp ?? "none"}`);
+
           lock.release();
-          return null;
+          return foundOtp;
         } catch (err) {
           try { lock?.release(); } catch { }
           if (!client.usable) resetClient();
@@ -176,8 +171,21 @@ export async function GET(request: Request) {
         }
       }
 
-      const initial = await pollOnce();
-      if (initial && !done) { done = true; send({ otp: initial }); }
+      // Baseline: mark all pre-existing UIDs as seen WITHOUT fetching them.
+      // These emails pre-date our `since` and aren't relevant to this registration,
+      // so there's no point spending an entire 4s round-trip downloading their headers.
+      let baselineLock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>> | undefined;
+      const tBaseline = Date.now();
+      try {
+        baselineLock = await client.getMailboxLock("INBOX");
+        const baseline = await searchUids();
+        for (const uid of baseline) seenUids.add(uid);
+        baselineLock.release();
+        console.log(`[OTP] baseline: ${baseline.length} existing UIDs marked in ${Date.now() - tBaseline}ms`);
+      } catch (e) {
+        try { baselineLock?.release(); } catch { }
+        throw e;
+      }
 
       while (!done) {
         await sleep(POLL_INTERVAL_MS);
