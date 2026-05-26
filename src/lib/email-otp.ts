@@ -158,7 +158,7 @@ export async function fetchCbtlOtpForEmail(
           console.log(`[IMAP] SUCCESS! OTP=${otp} for ${targetTo}, messageId=${messageId}`);
           return {
             otp,
-            receivedAt: emailDate,
+            receivedAt: new Date(emailDate),
             messageId
           };
         }
