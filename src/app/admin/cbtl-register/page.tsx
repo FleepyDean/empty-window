@@ -29,7 +29,6 @@ type AccountEntry = {
 
 const SERVICE = "ot"; // "Any other" service on HeroSMS
 const POLL_INTERVAL_MS = 4000;
-const EMAIL_OTP_POLL_INTERVAL_MS = 3000;
 const SS_KEY = "cbtl_register_session";
 
 type PersistedSession = {
@@ -74,7 +73,7 @@ export default function CbtlRegisterPage() {
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
-  const emailPollRef = useRef<NodeJS.Timeout | null>(null);
+  const emailPollRef = useRef<EventSource | null>(null);
 
   // ── Fetch helpers ──────────────────────────────────────────────────────────
 
@@ -124,24 +123,7 @@ export default function CbtlRegisterPage() {
         if (s.activeEmailId) setActiveEmailId(s.activeEmailId);
         if (s.emailOtp) { setEmailOtp(s.emailOtp); setEmailOtpStatus("success"); }
         else if (s.emailOtpStatus === "polling" && s.emailPollingSince && s.activeEmailAddress) {
-          setEmailOtpStatus("polling");
-          // resume email polling from original since timestamp
-          const since = new Date(s.emailPollingSince);
-          emailPollRef.current = setInterval(async () => {
-            try {
-              const res = await fetch(
-                `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(s.activeEmailAddress)}&since=${encodeURIComponent(since.toISOString())}`
-              );
-              const d = await res.json();
-              if (d.status === "success" && d.otp) {
-                stopEmailPolling();
-                setEmailOtp(d.otp);
-                setEmailOtpStatus("success");
-                saveSession({ emailOtp: d.otp, emailOtpStatus: "success" });
-                toast.success(`Email OTP received: ${d.otp}`);
-              }
-            } catch { /* ignore */ }
-          }, EMAIL_OTP_POLL_INTERVAL_MS);
+          startEmailPolling(s.activeEmailAddress, new Date(s.emailPollingSince));
         }
         if (s.sms && s.sms.status === "waiting") {
           const smsData = { ...s.sms, status: "waiting" as const };
@@ -151,16 +133,20 @@ export default function CbtlRegisterPage() {
             setElapsed(Math.floor((Date.now() - s.smsRequestedAt) / 1000));
           }
           elapsedRef.current = setInterval(() => setElapsed((p) => p + 1), 1000);
+          let smsFound = false;
           pollRef.current = setInterval(async () => {
+            if (smsFound) return;
             try {
               const res = await fetch(`/api/admin/cbtl-register/sms?id=${s.sms!.activationId}`);
               const d = await res.json();
-              if (d.status === "success" && d.otp) {
+              if (d.status === "success" && d.otp && !smsFound) {
+                smsFound = true;
                 stopPolling();
                 setSms((prev) => prev ? { ...prev, otp: d.otp, status: "success" } : prev);
                 saveSession({ sms: { ...s.sms!, otp: d.otp, status: "success" } });
                 toast.success(`OTP received: ${d.otp}`);
-              } else if (d.status === "cancelled") {
+              } else if (d.status === "cancelled" && !smsFound) {
+                smsFound = true;
                 stopPolling();
                 setSms((prev) => prev ? { ...prev, status: "cancelled" } : prev);
                 saveSession({ sms: { ...s.sms!, status: "cancelled" } });
@@ -187,38 +173,50 @@ export default function CbtlRegisterPage() {
   }
 
   function stopEmailPolling() {
-    if (emailPollRef.current) clearInterval(emailPollRef.current);
-    emailPollRef.current = null;
+    if (emailPollRef.current) {
+      emailPollRef.current.close();
+      emailPollRef.current = null;
+    }
   }
 
-  function startEmailPolling(email: string) {
+  function startEmailPolling(email: string, sinceOverride?: Date) {
     stopEmailPolling();
-    const since = new Date();
+    const since = sinceOverride ?? new Date();
     setEmailOtp(null);
     setEmailOtpStatus("polling");
     saveSession({ emailOtpStatus: "polling", emailPollingSince: since.toISOString(), activeEmailAddress: email, emailOtp: null });
 
-    const pollOnce = async () => {
+    let found = false;
+    const url = `/api/admin/cbtl-register/email-otp/stream?email=${encodeURIComponent(email)}&since=${encodeURIComponent(since.toISOString())}`;
+    const es = new EventSource(url);
+
+    es.onmessage = (evt) => {
       try {
-        const res = await fetch(
-          `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(email)}&since=${encodeURIComponent(since.toISOString())}`
-        );
-        const d = await res.json();
-        if (d.status === "success" && d.otp) {
+        const d = JSON.parse(evt.data);
+        if (d.heartbeat) return;
+        if (d.otp && !found) {
+          found = true;
           stopEmailPolling();
           setEmailOtp(d.otp);
           setEmailOtpStatus("success");
           saveSession({ emailOtp: d.otp, emailOtpStatus: "success" });
           toast.success(`Email OTP received: ${d.otp}`);
         }
-      } catch {
-        // ignore transient errors
+      } catch { /* ignore */ }
+    };
+
+    es.onerror = () => {
+      if (!found) {
+        es.close();
+        emailPollRef.current = null;
+        // Brief reconnect delay
+        setTimeout(() => {
+          if (!found) startEmailPolling(email, since);
+        }, 3000);
       }
     };
 
-    // Fire immediately, then every 3s
-    pollOnce();
-    emailPollRef.current = setInterval(pollOnce, EMAIL_OTP_POLL_INTERVAL_MS);
+    emailPollRef.current = es;
   }
 
   function startPolling(activationId: string) {
@@ -229,18 +227,22 @@ export default function CbtlRegisterPage() {
       setElapsed((p) => p + 1);
     }, 1000);
 
+    let smsFound = false;
     pollRef.current = setInterval(async () => {
+      if (smsFound) return;
       try {
         const res = await fetch(`/api/admin/cbtl-register/sms?id=${activationId}`);
         const d = await res.json();
-        if (d.status === "success" && d.otp) {
+        if (d.status === "success" && d.otp && !smsFound) {
+          smsFound = true;
           stopPolling();
           setSms((prev) => {
             if (prev) { saveSession({ sms: { ...prev, otp: d.otp, status: "success" } }); }
             return prev ? { ...prev, otp: d.otp, status: "success" } : prev;
           });
           toast.success(`OTP received: ${d.otp}`);
-        } else if (d.status === "cancelled") {
+        } else if (d.status === "cancelled" && !smsFound) {
+          smsFound = true;
           stopPolling();
           setSms((prev) => {
             if (prev) { saveSession({ sms: { ...prev, status: "cancelled" } }); }
