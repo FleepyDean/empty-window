@@ -11,6 +11,8 @@ const IMAP_PORT = Number(process.env.GMAIL_IMAP_PORT ?? 993);
 const IMAP_USER = process.env.GMAIL_BASE_EMAIL ?? "";
 const IMAP_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
 const CBTL_FROM_EXACT = "no-reply@my.thecoffeebeanandtealeaf.com";
+const POLL_INTERVAL_MS = 1500;
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 function extractRawFromHeader(buf: Buffer): string {
   const str = buf.toString("utf8");
@@ -77,51 +79,52 @@ export async function GET(request: Request) {
       });
 
       await client.connect();
-      console.log(`[IDLE] Connected in ${Date.now() - t0}ms`);
-
+      console.log(`[OTP] Connected in ${Date.now() - t0}ms`);
       lock = await client.getMailboxLock("INBOX");
-      console.log(`[IDLE] Mailbox locked in ${Date.now() - t0}ms`);
+      console.log(`[OTP] Ready in ${Date.now() - t0}ms`);
 
-      // Check if OTP already arrived before we connected
-      const existing = await initialScan(client, targetTo, since, t0);
-      if (existing) {
-        done = true;
-        send({ otp: existing });
-        await finish(client, lock);
-        return;
+      const searchSince = new Date(since);
+      searchSince.setDate(searchSince.getDate() - 1);
+      const seenUids = new Set<number>();
+
+      async function findNewUids(): Promise<number[]> {
+        let uids: number[] = [];
+        try {
+          uids = await client!.search(
+            { raw: `to:(${targetTo}) from:(${CBTL_FROM_EXACT})`, since: searchSince } as never,
+            { uid: true }
+          ) as unknown as number[];
+        } catch {
+          uids = await client!.search(
+            { from: CBTL_FROM_EXACT, since: searchSince } as never,
+            { uid: true }
+          ) as unknown as number[];
+        }
+        const arr = Array.isArray(uids) ? uids : [];
+        const fresh = arr.filter(uid => !seenUids.has(uid));
+        for (const uid of arr) seenUids.add(uid);
+        return fresh.sort((a, b) => b - a);
       }
 
-      console.log(`[IDLE] Entering IDLE at ${Date.now() - t0}ms — waiting for EXISTS push`);
+      for (const uid of (await findNewUids()).slice(0, 5)) {
+        const otp = await fetchAndCheck(client, String(uid), targetTo, since, t0);
+        if (otp && !done) { done = true; send({ otp }); await finish(client, lock); return; }
+      }
+      console.log(`[OTP] Polling every ${POLL_INTERVAL_MS}ms from +${Date.now() - t0}ms`);
 
-      // IMAP IDLE: Gmail pushes EXISTS the instant a new email lands.
-      // 'count' is the new mailbox total — the newest email is at seqno 'count'.
-      // Fetch it directly by seqno: no search round-trip needed.
-      client.on("exists", async ({ count }: { count: number }) => {
-        if (done) return;
-        console.log(`[IDLE] EXISTS fired (count=${count}) at +${Date.now() - t0}ms`);
-        const otp = await fetchAndCheck(client!, String(count), targetTo, since, false, t0);
-        if (otp && !done) {
-          done = true;
-          console.log(`[IDLE] OTP found at +${Date.now() - t0}ms`);
-          send({ otp });
-          try { (client as ImapFlow & { idleNotify(): void }).idleNotify(); } catch { }
+      const hb = setInterval(() => { if (!done) send({ heartbeat: true }); else clearInterval(hb); }, 20000);
+      request.signal.addEventListener("abort", () => { done = true; clearInterval(hb); finish(client, lock); });
+
+      while (!done) {
+        await sleep(POLL_INTERVAL_MS);
+        if (done) break;
+        for (const uid of (await findNewUids()).slice(0, 5)) {
+          const otp = await fetchAndCheck(client, String(uid), targetTo, since, t0);
+          if (otp && !done) { done = true; console.log(`[OTP] Found at +${Date.now() - t0}ms`); send({ otp }); break; }
         }
-      });
-
-      const hb = setInterval(() => {
-        if (done) { clearInterval(hb); return; }
-        send({ heartbeat: true });
-      }, 25000);
-
-      request.signal.addEventListener("abort", () => {
-        done = true;
-        clearInterval(hb);
-        finish(client, lock);
-      });
-
-      await client.idle();
+      }
       clearInterval(hb);
-      if (!done) await finish(client, lock);
+      await finish(client, lock);
 
     } catch (err) {
       console.error(`[IDLE] Error at +${Date.now() - t0}ms:`, err instanceof Error ? err.message : err);
@@ -140,89 +143,26 @@ export async function GET(request: Request) {
   });
 }
 
-/**
- * Search for a pre-existing OTP using X-GM-RAW (Gmail-specific narrow search).
- * Falls back to from-only search if X-GM-RAW fails.
- */
-async function initialScan(
-  client: ImapFlow, targetTo: string, since: Date, t0: number
-): Promise<string | null> {
-  const searchSince = new Date(since);
-  searchSince.setDate(searchSince.getDate() - 1);
-
-  let uids: number[] = [];
-  try {
-    // X-GM-RAW narrows results to this exact recipient — usually 0 or 1 result
-    uids = await client.search(
-      { raw: `to:(${targetTo}) from:(${CBTL_FROM_EXACT})`, since: searchSince } as never,
-      { uid: true }
-    ) as unknown as number[];
-  } catch {
-    // Fallback: search by sender only, filter To: in memory
-    uids = await client.search(
-      { from: CBTL_FROM_EXACT, since: searchSince } as never,
-      { uid: true }
-    ) as unknown as number[];
-  }
-
-  const uidArray = Array.isArray(uids) ? uids : [];
-  console.log(`[IDLE] Initial scan: ${uidArray.length} candidate(s) at +${Date.now() - t0}ms`);
-  if (!uidArray.length) return null;
-
-  const sorted = [...uidArray].sort((a, b) => b - a).slice(0, 5);
-  for (const uid of sorted) {
-    const otp = await fetchAndCheck(client, String(uid), targetTo, since, true, t0);
-    if (otp) return otp;
-  }
-  return null;
-}
-
-/**
- * Two-phase fetch:
- *   Phase 1 — headers only (~100ms): verify From/To/Date without downloading the email body.
- *   Phase 2 — source only if Phase 1 passes (~1s): parse body and extract OTP.
- *
- * @param id      Sequence number (byUid=false) or UID string (byUid=true)
- * @param byUid   Whether `id` is a UID (true) or seqno (false)
- */
 async function fetchAndCheck(
-  client: ImapFlow, id: string, targetTo: string,
-  since: Date, byUid: boolean, t0: number
+  client: ImapFlow, uid: string, targetTo: string, since: Date, t0: number
 ): Promise<string | null> {
   try {
-    // Phase 1: cheap header fetch
-    const hdrMsg = await client.fetchOne(
-      id,
-      { headers: ["from", "to", "date"], internalDate: true },
-      { uid: byUid }
-    );
+    const hdrMsg = await client.fetchOne(uid, { headers: ["from", "to", "date"], internalDate: true }, { uid: true });
     if (!hdrMsg) return null;
-
     const emailDate = hdrMsg.internalDate ?? null;
     if (!emailDate || emailDate < since) return null;
-
     const hdrs = hdrMsg.headers as Buffer | undefined;
     if (!hdrs) return null;
-
     if (extractRawFromHeader(hdrs) !== CBTL_FROM_EXACT) return null;
     const toAddrs = extractRawToHeader(hdrs);
-    if (!toAddrs.includes(targetTo)) {
-      console.log(`[IDLE] Header check failed: to=[${toAddrs.join(",")}] target=${targetTo}`);
-      return null;
-    }
-
-    console.log(`[IDLE] Header matched ${id} at +${Date.now() - t0}ms — fetching source`);
-
-    // Phase 2: full source only for the matching message
-    const srcMsg = await client.fetchOne(id, { source: true }, { uid: byUid });
+    if (!toAddrs.includes(targetTo)) return null;
+    console.log(`[OTP] Headers matched uid=${uid} at +${Date.now() - t0}ms — fetching body`);
+    const srcMsg = await client.fetchOne(uid, { source: true }, { uid: true });
     if (!srcMsg || !srcMsg.source) return null;
-
     const parsed = await simpleParser(srcMsg.source as Buffer);
     const text = (parsed.text ?? "").trim();
     const html = typeof parsed.html === "string" ? parsed.html : "";
     const body = text || html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
     return extractCbtlOtp(body);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
