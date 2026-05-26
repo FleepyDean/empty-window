@@ -104,8 +104,11 @@ export async function GET(request: Request) {
 
       async function pollOnce(): Promise<string | null> {
         let lock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>> | undefined;
+        const tStart = Date.now();
         try {
           lock = await client.getMailboxLock("INBOX");
+          const tLock = Date.now();
+
           let uids: number[] = [];
           try {
             uids = await client.search(
@@ -118,11 +121,50 @@ export async function GET(request: Request) {
               { uid: true }
             ) as unknown as number[];
           }
+          const tSearch = Date.now();
+
           const arr = Array.isArray(uids) ? uids : [];
           const newUids = arr.filter(uid => !seenUids.has(uid));
           for (const uid of arr) seenUids.add(uid);
-          for (const uid of newUids.sort((a, b) => b - a).slice(0, 5)) {
-            const otp = await fetchAndCheck(client, String(uid), targetTo, since, t0);
+
+          if (newUids.length === 0) {
+            console.log(`[OTP] poll: lock=${tLock - tStart}ms search=${tSearch - tLock}ms 0 new`);
+            lock.release();
+            return null;
+          }
+
+          // Batch headers fetch — ONE IMAP command for all candidates instead of N round-trips
+          const candidates = newUids.sort((a, b) => b - a).slice(0, 10);
+          const matches: number[] = [];
+          const tHdrStart = Date.now();
+          for await (const msg of client.fetch(
+            candidates.join(","),
+            { headers: ["from", "to", "date"], internalDate: true },
+            { uid: true }
+          )) {
+            if (!msg) continue;
+            const emailDate = msg.internalDate ?? null;
+            if (!emailDate || emailDate < since) continue;
+            const hdrs = msg.headers as Buffer | undefined;
+            if (!hdrs) continue;
+            if (extractRawFromHeader(hdrs) !== CBTL_FROM_EXACT) continue;
+            const toAddrs = extractRawToHeader(hdrs);
+            if (!toAddrs.includes(targetTo)) continue;
+            matches.push(msg.uid);
+          }
+          const tHdrEnd = Date.now();
+          console.log(`[OTP] poll: lock=${tLock - tStart}ms search=${tSearch - tLock}ms headers=${tHdrEnd - tHdrStart}ms (${candidates.length} cand, ${matches.length} match)`);
+
+          for (const uid of matches.sort((a, b) => b - a)) {
+            const tBody = Date.now();
+            const srcMsg = await client.fetchOne(String(uid), { source: true }, { uid: true });
+            if (!srcMsg || !(srcMsg as { source?: Buffer }).source) continue;
+            const parsed = await simpleParser((srcMsg as { source: Buffer }).source);
+            const text = (parsed.text ?? "").trim();
+            const html = typeof parsed.html === "string" ? parsed.html : "";
+            const body = text || html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+            const otp = extractCbtlOtp(body);
+            console.log(`[OTP] body uid=${uid}: ${Date.now() - tBody}ms otp=${otp ?? "none"}`);
             if (otp) { lock.release(); return otp; }
           }
           lock.release();
