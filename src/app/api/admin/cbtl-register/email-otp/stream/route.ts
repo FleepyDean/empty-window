@@ -84,7 +84,8 @@ export async function GET(request: Request) {
   let done = false;
 
   const send = (data: unknown) => {
-    try { writer.write(enc.encode(`data: ${JSON.stringify(data)}\n\n`)); } catch { }
+    if (done) return;
+    writer.write(enc.encode(`data: ${JSON.stringify(data)}\n\n`)).catch(() => { done = true; });
   };
 
   // Heartbeat starts IMMEDIATELY — keeps the stream open while IMAP connects
@@ -103,24 +104,20 @@ export async function GET(request: Request) {
       const seenUids = new Set<number>();
 
       async function searchUids(): Promise<number[]> {
-        try {
-          return await client.search(
-            { raw: `to:(${targetTo}) from:(${CBTL_FROM_EXACT})`, since: searchSince } as never,
-            { uid: true }
-          ) as unknown as number[];
-        } catch {
-          return await client.search(
-            { from: CBTL_FROM_EXACT, since: searchSince } as never,
-            { uid: true }
-          ) as unknown as number[];
-        }
+        const result = await client.search(
+          { from: CBTL_FROM_EXACT, since: searchSince } as never,
+          { uid: true }
+        ) as unknown as number[];
+        const arr = Array.isArray(result) ? result : [];
+        console.log(`[OTP] searchUids: ${arr.length} from CBTL sender since ${searchSince.toDateString()}`);
+        return arr;
       }
 
       async function pollOnce(): Promise<string | null> {
         let lock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>> | undefined;
         const tStart = Date.now();
         try {
-          lock = await client.getMailboxLock("INBOX");
+          lock = await client.getMailboxLock("[Gmail]/All Mail");
           const tLock = Date.now();
           const uids = await searchUids();
           const tSearch = Date.now();
@@ -128,9 +125,9 @@ export async function GET(request: Request) {
           const arr = Array.isArray(uids) ? uids : [];
           const newUids = arr.filter(uid => !seenUids.has(uid));
           for (const uid of arr) seenUids.add(uid);
+          console.log(`[OTP] poll: lock=${tLock - tStart}ms search=${tSearch - tLock}ms total=${arr.length} new=${newUids.length}`);
 
           if (newUids.length === 0) {
-            console.log(`[OTP] poll: lock=${tLock - tStart}ms search=${tSearch - tLock}ms 0 new`);
             lock.release();
             return null;
           }
@@ -146,17 +143,20 @@ export async function GET(request: Request) {
           )) {
             if (!msg) continue;
             const emailDate = msg.internalDate ?? null;
-            if (!emailDate || emailDate < since) continue;
             const src = (msg as { source?: Buffer }).source;
-            if (!src) continue;
-            if (extractRawFromHeader(src) !== CBTL_FROM_EXACT) continue;
-            const toAddrs = extractRawToHeader(src);
-            if (!toAddrs.includes(targetTo)) continue;
+            const fromHdr = src ? extractRawFromHeader(src) : "(no src)";
+            const toAddrs = src ? extractRawToHeader(src) : [];
+            console.log(`[OTP] uid=${msg.uid} date=${emailDate instanceof Date ? emailDate.toISOString() : emailDate} since=${since.toISOString()} from=${fromHdr} to=[${toAddrs.join(",")}] target=${targetTo}`);
+            if (!emailDate || emailDate < since) { console.log(`[OTP] uid=${msg.uid} SKIP: date`); continue; }
+            if (!src) { console.log(`[OTP] uid=${msg.uid} SKIP: no source`); continue; }
+            if (fromHdr !== CBTL_FROM_EXACT) { console.log(`[OTP] uid=${msg.uid} SKIP: from mismatch`); continue; }
+            if (!toAddrs.includes(targetTo)) { console.log(`[OTP] uid=${msg.uid} SKIP: to mismatch`); continue; }
             const parsed = await simpleParser(src);
             const text = (parsed.text ?? "").trim();
             const html = typeof parsed.html === "string" ? parsed.html : "";
             const body = text || html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
             const otp = extractCbtlOtp(body);
+            console.log(`[OTP] uid=${msg.uid} otp=${otp ?? "none"}`);
             if (otp) { foundOtp = otp; break; }
           }
           const tFetchEnd = Date.now();
@@ -171,17 +171,15 @@ export async function GET(request: Request) {
         }
       }
 
-      // Baseline: mark all pre-existing UIDs as seen WITHOUT fetching them.
-      // These emails pre-date our `since` and aren't relevant to this registration,
-      // so there's no point spending an entire 4s round-trip downloading their headers.
+      // Baseline: one search to find all pre-existing sender emails, mark as seen.
       let baselineLock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>> | undefined;
       const tBaseline = Date.now();
       try {
-        baselineLock = await client.getMailboxLock("INBOX");
+        baselineLock = await client.getMailboxLock("[Gmail]/All Mail");
         const baseline = await searchUids();
         for (const uid of baseline) seenUids.add(uid);
         baselineLock.release();
-        console.log(`[OTP] baseline: ${baseline.length} existing UIDs marked in ${Date.now() - tBaseline}ms`);
+        console.log(`[OTP] baseline: ${baseline.length} sender UIDs marked in ${Date.now() - tBaseline}ms`);
       } catch (e) {
         try { baselineLock?.release(); } catch { }
         throw e;

@@ -73,7 +73,7 @@ export default function CbtlRegisterPage() {
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
-  const emailPollRef = useRef<EventSource | null>(null);
+  const emailPollRef = useRef<NodeJS.Timeout | null>(null);
 
   // ── Fetch helpers ──────────────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ export default function CbtlRegisterPage() {
 
   function stopEmailPolling() {
     if (emailPollRef.current) {
-      emailPollRef.current.close();
+      clearInterval(emailPollRef.current);
       emailPollRef.current = null;
     }
   }
@@ -186,16 +186,13 @@ export default function CbtlRegisterPage() {
     setEmailOtpStatus("polling");
     saveSession({ emailOtpStatus: "polling", emailPollingSince: since.toISOString(), activeEmailAddress: email, emailOtp: null });
 
-    let found = false;
-    const url = `/api/admin/cbtl-register/email-otp/stream?email=${encodeURIComponent(email)}&since=${encodeURIComponent(since.toISOString())}`;
-    const es = new EventSource(url);
-
-    es.onmessage = (evt) => {
+    const poll = setInterval(async () => {
       try {
-        const d = JSON.parse(evt.data);
-        if (d.heartbeat) return;
-        if (d.otp && !found) {
-          found = true;
+        const url = `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(email)}&since=${encodeURIComponent(since.toISOString())}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const d = await res.json();
+        if (d.status === "success" && d.otp) {
           stopEmailPolling();
           setEmailOtp(d.otp);
           setEmailOtpStatus("success");
@@ -203,20 +200,9 @@ export default function CbtlRegisterPage() {
           toast.success(`Email OTP received: ${d.otp}`);
         }
       } catch { /* ignore */ }
-    };
+    }, 4000);
 
-    es.onerror = () => {
-      if (!found) {
-        es.close();
-        emailPollRef.current = null;
-        // Brief reconnect delay
-        setTimeout(() => {
-          if (!found) startEmailPolling(email, since);
-        }, 3000);
-      }
-    };
-
-    emailPollRef.current = es;
+    emailPollRef.current = poll;
   }
 
   function startPolling(activationId: string) {
