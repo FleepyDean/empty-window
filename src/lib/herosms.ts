@@ -115,13 +115,26 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {
 }
 
 export async function getNumberCheapest(service = DEFAULT_SERVICE) {
-  // Fetch current min price dynamically so we always get the cheapest operator.
-  const minPrice = await getMinPrice(service).catch((e) => {
-    console.error(`[HeroSMS] getMinPrice error:`, e instanceof Error ? e.message : e);
-    return null;
-  });
-  console.log(`[HeroSMS] getNumberCheapest service=${service} minPrice=${minPrice}`);
-  return getNumber(service, minPrice ?? undefined);
+  // Loyalty tier $0.0704 discount is specific to 'ot' (Any other) service.
+  // Other services have different pricing — don't hardcode loyalty price there.
+  if (service === "ot") {
+    const loyaltyPrice = 0.0704;
+    try {
+      console.log(`[HeroSMS] getNumberCheapest trying loyalty price ${loyaltyPrice}`);
+      return await getNumber(service, loyaltyPrice);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // If loyalty pool exhausted or price invalid, fall back to regular pricing
+      if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
+        console.log(`[HeroSMS] Loyalty pool exhausted (${msg}), falling back to regular price`);
+        return getNumber(service); // no maxPrice = whatever is available
+      }
+      throw err; // Other errors propagate
+    }
+  }
+
+  // For non-ot services, just get whatever is available
+  return getNumber(service);
 }
 
 export async function getOtp(activationId: string) {
