@@ -14,8 +14,10 @@ async function heroRequest(params: Record<string, string>) {
   const search = new URLSearchParams({ api_key: API_KEY, ...params });
   const url = `${BASE_URL}?${search.toString()}`;
 
+  console.log(`[HeroSMS] Request: ${url.replace(API_KEY, "***")}`);
   const response = await fetch(url, { method: "GET", cache: "no-store" });
   const text = (await response.text()).trim();
+  console.log(`[HeroSMS] Response: ${text}`);
 
   if (!response.ok) {
     throw new Error(`HeroSMS HTTP ${response.status}: ${text}`);
@@ -60,22 +62,24 @@ export async function getMinPrice(service: string, country = DEFAULT_COUNTRY): P
       country,
       service
     });
+    console.log(`[HeroSMS] getPricesVerification raw: ${raw.substring(0, 500)}`);
     try {
       const parsed = JSON.parse(raw);
       collectAvailableCosts(parsed, service, false, candidateCosts);
     } catch {
       // not JSON — ignore
     }
-  } catch {
-    // endpoint may not be supported — ignore
+  } catch (e) {
+    console.log(`[HeroSMS] getPricesVerification error:`, e instanceof Error ? e.message : e);
   }
 
   // 2) Fall back to getPrices (consolidated pricing)
   try {
-    const { prices } = await getPrices(service, country);
+    const { prices, raw } = await getPrices(service, country);
+    console.log(`[HeroSMS] getPrices raw: ${raw.substring(0, 500)}`);
     collectAvailableCosts(prices, service, false, candidateCosts);
-  } catch {
-    // ignore
+  } catch (e) {
+    console.log(`[HeroSMS] getPrices error:`, e instanceof Error ? e.message : e);
   }
 
   console.log(`[HeroSMS] getMinPrice service=${service} candidates=[${candidateCosts.join(",")}]`);
