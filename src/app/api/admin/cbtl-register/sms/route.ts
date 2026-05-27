@@ -1,5 +1,5 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { cancelNumber, getBalance, getNumber, getOtp } from "@/lib/herosms";
+import { cancelNumber, getBalance, getNumberCheapest, getOtp } from "@/lib/herosms";
 import { NextResponse } from "next/server";
 
 // POST /api/admin/cbtl-register/sms  — request a new phone number
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const { service } = await request.json().catch(() => ({}));
 
   try {
-    const result = await getNumber(service ?? "ot");
+    const result = await getNumberCheapest(service ?? "ot");
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

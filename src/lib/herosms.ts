@@ -78,6 +78,7 @@ export async function getMinPrice(service: string, country = DEFAULT_COUNTRY): P
     // ignore
   }
 
+  console.log(`[HeroSMS] getMinPrice service=${service} candidates=[${candidateCosts.join(",")}]`);
   if (candidateCosts.length === 0) return null;
   return Math.min(...candidateCosts);
 }
@@ -110,9 +111,13 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {
 }
 
 export async function getNumberCheapest(service = DEFAULT_SERVICE) {
-  // Call without maxPrice — let HeroSMS assign from whatever is available.
-  // Using maxPrice can cause WRONG_MAX_PRICE if the service price changes.
-  return getNumber(service);
+  // Fetch current min price dynamically so we always get the cheapest operator.
+  const minPrice = await getMinPrice(service).catch((e) => {
+    console.error(`[HeroSMS] getMinPrice error:`, e instanceof Error ? e.message : e);
+    return null;
+  });
+  console.log(`[HeroSMS] getNumberCheapest service=${service} minPrice=${minPrice}`);
+  return getNumber(service, minPrice ?? undefined);
 }
 
 export async function getOtp(activationId: string) {
