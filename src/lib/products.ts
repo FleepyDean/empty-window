@@ -20,7 +20,7 @@ const ZUS_INSTRUCTIONS = `📦 Preferably for PICKUP — If want DELIVERY, remar
 - Insert phone number given and click send "SMS" - NOT "WHATSAPP" (IMPORTANT)
 - Insert random name and email
 - For Date of Birth, fill in tomorrow's date with any year. (Receive Buy 1 Free 1 Cake birthday redemption the next day)
-- DO NOT ENTER ANY REFERRAL CODE! SKIP THE REFERRAL SECTION!
+- In the Referral Code section, enter "DANIFQP" (important!)
 - Maximum of RM10.50 only for free drink redemption
 
 After registration and login:

@@ -114,26 +114,31 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number) {
   };
 }
 
+// Loyalty tier prices per service — cheaper than the standard API-reported price.
+// These are account-level discounts that getPrices won't show but getNumber will honor.
+const LOYALTY_PRICES: Record<string, number> = {
+  ot: 0.0704,
+  aik: 0.0386
+};
+
 export async function getNumberCheapest(service = DEFAULT_SERVICE) {
-  // Loyalty tier $0.0704 discount is specific to 'ot' (Any other) service.
-  // Other services have different pricing — don't hardcode loyalty price there.
-  if (service === "ot") {
-    const loyaltyPrice = 0.0704;
+  const loyaltyPrice = LOYALTY_PRICES[service];
+  if (loyaltyPrice !== undefined) {
     try {
-      console.log(`[HeroSMS] getNumberCheapest trying loyalty price ${loyaltyPrice}`);
+      console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice}`);
       return await getNumber(service, loyaltyPrice);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // If loyalty pool exhausted or price invalid, fall back to regular pricing
       if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
-        console.log(`[HeroSMS] Loyalty pool exhausted (${msg}), falling back to regular price`);
-        return getNumber(service); // no maxPrice = whatever is available
+        console.log(`[HeroSMS] Loyalty pool exhausted for ${service} (${msg}), falling back to regular price`);
+        return getNumber(service);
       }
-      throw err; // Other errors propagate
+      throw err;
     }
   }
 
-  // For non-ot services, just get whatever is available
+  // For services without a loyalty price, just get whatever is available
   return getNumber(service);
 }
 
