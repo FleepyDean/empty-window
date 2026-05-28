@@ -31,9 +31,41 @@ export async function POST(request: Request) {
       }
     }
 
-    await prisma.claim.update({
-      where: { claimId },
-      data: { status: "expired" }
+    // Restore quantity and mark as expired (same logic as cancel endpoint)
+    await prisma.$transaction(async (tx) => {
+      if (claim.quantityDeducted) {
+        if (claim.orderItemId) {
+          const orderItem = await tx.orderItem.findUnique({ where: { id: claim.orderItemId } });
+          if (orderItem) {
+            await tx.orderItem.update({
+              where: { id: claim.orderItemId },
+              data: { remainingQty: orderItem.remainingQty + 1 }
+            });
+          }
+        } else {
+          const order = await tx.order.findUnique({ where: { orderId: claim.orderId } });
+          if (order) {
+            await tx.order.update({
+              where: { orderId: claim.orderId },
+              data: { quantity: order.quantity + 1, status: "active" }
+            });
+          }
+        }
+      }
+
+      // Release email back to pool if assigned
+      const emailAccount = await tx.emailAccount.findFirst({ where: { claimId } });
+      if (emailAccount) {
+        await tx.emailAccount.update({
+          where: { id: emailAccount.id },
+          data: { status: "available", claimId: null, assignedAt: null }
+        });
+      }
+
+      await tx.claim.update({
+        where: { claimId },
+        data: { status: "expired", quantityDeducted: false }
+      });
     });
 
     // Refetch with relations for product info
