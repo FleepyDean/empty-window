@@ -637,6 +637,7 @@ function RedeemPageContent() {
   }, [orderDetails?.orderId]);
 
   // Auto-restore CBTL claim from order history when page loads
+  // Only restore if no remaining quantity — otherwise allow claiming new emails
   useEffect(() => {
     if (!orderDetails || activeClaim || claimState !== "idle") return;
 
@@ -646,6 +647,12 @@ function RedeemPageContent() {
     );
 
     if (cbtlClaim) {
+      // Check if there's remaining quantity for this product
+      const cbtlProduct = orderDetails.products.find((p) => p.productKey === "cbtl");
+      const hasRemainingQty = (cbtlProduct?.remainingQty ?? 0) > 0;
+
+      // If there's remaining quantity, don't restore — let user claim a new email
+      if (hasRemainingQty) return;
       setActiveClaim({
         claimId: cbtlClaim.claimId,
         phoneNumber: cbtlClaim.phoneNumber ?? "",

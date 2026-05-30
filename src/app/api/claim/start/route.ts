@@ -139,9 +139,7 @@ export async function POST(request: Request) {
     });
   }
 
-  // For CBTL: if there's already a success claim on this order item with an email assigned,
-  // return it so the user can request a new OTP on the same email address instead of
-  // consuming a new email from the pool.
+  // For CBTL: check for existing success claim to allow OTP resend OR new claim if quantity remains
   if (isEmailFirst) {
     const existingSuccessClaim = await prisma.claim.findFirst({
       where: {
@@ -153,16 +151,32 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "desc" }
     });
 
+    // Only return existing claim if no remaining quantity (for resume OTP)
+    // Otherwise allow creating a new claim for additional quantity
     if (existingSuccessClaim) {
-      return NextResponse.json({
-        claimId: existingSuccessClaim.claimId,
-        phoneNumber: null,
-        emailAddress: existingSuccessClaim.emailAddress,
-        emailOtp: existingSuccessClaim.emailOtp,
-        expiresAt: existingSuccessClaim.expiresAt.getTime(),
-        productName,
-        resumeNewOtp: true
-      });
+      // Check current remaining quantity
+      let remainingQty = 0;
+      if (targetItemId) {
+        const orderItem = await prisma.orderItem.findUnique({ where: { id: targetItemId } });
+        remainingQty = orderItem?.remainingQty ?? 0;
+      } else {
+        const ord = await prisma.order.findUnique({ where: { orderId: trimmedOrderId } });
+        remainingQty = ord?.quantity ?? 0;
+      }
+
+      if (remainingQty === 0) {
+        // No quantity left, return existing claim for OTP resend
+        return NextResponse.json({
+          claimId: existingSuccessClaim.claimId,
+          phoneNumber: null,
+          emailAddress: existingSuccessClaim.emailAddress,
+          emailOtp: existingSuccessClaim.emailOtp,
+          expiresAt: existingSuccessClaim.expiresAt.getTime(),
+          productName,
+          resumeNewOtp: true
+        });
+      }
+      // If remainingQty > 0, fall through to create new claim below
     }
   }
 

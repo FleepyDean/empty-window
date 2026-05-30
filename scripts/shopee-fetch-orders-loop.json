@@ -10,7 +10,7 @@
     },
     {
       "Command": "pause",
-      "Target": "5000",
+      "Target": "4000",
       "Value": "",
       "Description": "Wait for page reload"
     },
@@ -28,9 +28,9 @@
     },
     {
       "Command": "pause",
-      "Target": "60000",
+      "Target": "30000",
       "Value": "",
-      "Description": "Wait 60 seconds before next fetch"
+      "Description": "Wait 30 seconds before next fetch"
     }
   ]
 }
