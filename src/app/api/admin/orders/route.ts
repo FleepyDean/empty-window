@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 function buildOrderId() {
   const stamp = Date.now().toString(36).toUpperCase();
   const random = Math.floor(1000 + Math.random() * 9000);
-  return `ORD-${stamp}-${random}`;
+  return `ORD${stamp}${random}`;
 }
 
 export async function GET() {
