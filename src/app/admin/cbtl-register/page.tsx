@@ -558,21 +558,23 @@ export default function CbtlRegisterPage() {
                     }`}>
                       {sms.status === "waiting" ? "Waiting for OTP..." : sms.status}
                     </span>
-                    <button
-                      onClick={cancelNumber}
-                      className="text-xs text-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {smsRequestedAt && elapsed < CANCEL_LOCK_SECONDS
-                        ? `Cancel (locked ${CANCEL_LOCK_SECONDS - elapsed}s)`
-                        : "Cancel number"}
-                    </button>
+                    {sms.status !== "success" && (
+                      <button
+                        onClick={cancelNumber}
+                        className="text-xs text-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {smsRequestedAt && elapsed < CANCEL_LOCK_SECONDS
+                          ? `Cancel (locked ${CANCEL_LOCK_SECONDS - elapsed}s)`
+                          : "Cancel number"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
                 <p className="text-xs text-slate-400">No number assigned yet.</p>
               )}
 
-              {(!sms || sms.status !== "waiting") && (
+              {(!sms || (sms.status !== "waiting" && sms.status !== "success")) && (
                 <button
                   onClick={requestNumber}
                   disabled={!activeEmailId || smsLoading}

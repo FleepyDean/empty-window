@@ -356,6 +356,29 @@ function RedeemPageContent() {
 
   const [resettingOtp, setResettingOtp] = useState(false);
   const [requestingNewOtp, setRequestingNewOtp] = useState(false);
+  const [resendingSmsOtp, setResendingSmsOtp] = useState(false);
+
+  async function resendSmsOtp() {
+    if (!activeClaim?.claimId || resendingSmsOtp) return;
+    setResendingSmsOtp(true);
+    try {
+      const res = await fetch("/api/claim/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimId: activeClaim.claimId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("OTP resent! Check your phone for the new SMS.");
+      } else {
+        toast.error(data.message ?? "Could not resend OTP.");
+      }
+    } catch {
+      toast.error("Request failed. Try again.");
+    } finally {
+      setResendingSmsOtp(false);
+    }
+  }
 
   async function requestNewOtp() {
     if (!activeClaim?.claimId || requestingNewOtp) return;
@@ -785,12 +808,24 @@ function RedeemPageContent() {
         </p>
 
         <form onSubmit={validateOrder} className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <input
-            value={orderIdInput}
-            onChange={(event) => setOrderIdInput(event.target.value)}
-            placeholder="Enter Order ID"
-            className="w-full border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-          />
+          <div className="relative flex-1">
+            <input
+              value={orderIdInput}
+              onChange={(event) => setOrderIdInput(event.target.value)}
+              placeholder="Enter Order ID"
+              className="w-full border border-slate-300 bg-white px-4 py-3 pr-10 text-sm text-slate-900 outline-none transition focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+            {orderIdInput && (
+              <button
+                type="button"
+                onClick={() => setOrderIdInput("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                aria-label="Clear"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            )}
+          </div>
           <button
             type="submit"
             disabled={isValidating}
@@ -1107,6 +1142,13 @@ function RedeemPageContent() {
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                             </button>
                           </div>
+                          <button
+                            onClick={resendSmsOtp}
+                            disabled={resendingSmsOtp}
+                            className="mt-3 w-full border border-cyan-500/50 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-500/20 disabled:opacity-50 dark:text-cyan-400"
+                          >
+                            {resendingSmsOtp ? "Resending..." : "OTP expired? Resend SMS OTP"}
+                          </button>
                         </motion.div>
                       )}
                     </motion.div>

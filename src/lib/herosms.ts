@@ -198,6 +198,20 @@ export async function cancelNumber(activationId: string) {
   };
 }
 
+export async function resendOtp(activationId: string) {
+  // status=3 means request resending of SMS
+  const raw = await heroRequest({
+    action: "setStatus" satisfies HeroAction,
+    id: activationId,
+    status: "3"
+  });
+
+  return {
+    success: raw.includes("ACCESS_RETRY_GET") || raw === "OK",
+    raw
+  };
+}
+
 export async function getBalance() {
   const raw = await heroRequest({ action: "getBalance" });
   // Expected: ACCESS_BALANCE:<amount>
