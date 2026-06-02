@@ -304,7 +304,7 @@ export default function CbtlRegisterPage() {
     if (smsRequestedAt) {
       const secondsSince = Math.floor((Date.now() - smsRequestedAt) / 1000);
       if (secondsSince < CANCEL_LOCK_SECONDS) {
-        toast.error(`HeroSMS blocks cancellation within 2 minutes. Wait ${CANCEL_LOCK_SECONDS - secondsSince}s more.`);
+        toast.error(`Cancellation disabled within 2 minutes. Wait ${CANCEL_LOCK_SECONDS - secondsSince}s more.`);
         return;
       }
     }

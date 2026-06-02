@@ -147,6 +147,11 @@ function RedeemPageContent() {
     return `${minutes}:${seconds}`;
   }, [timeLeftMs]);
 
+  // Copy helper with toast notification
+  function copyToClipboard(text: string, label: string) {
+    navigator.clipboard.writeText(text).then(() => toast.success(`Copied ${label}`));
+  }
+
   async function validateOrder(event: FormEvent) {
     event.preventDefault();
     setIsValidating(true);
@@ -357,6 +362,7 @@ function RedeemPageContent() {
   const [resettingOtp, setResettingOtp] = useState(false);
   const [requestingNewOtp, setRequestingNewOtp] = useState(false);
   const [resendingSmsOtp, setResendingSmsOtp] = useState(false);
+  const [resendPending, setResendPending] = useState(false);
 
   async function resendSmsOtp() {
     if (!activeClaim?.claimId || resendingSmsOtp) return;
@@ -369,7 +375,8 @@ function RedeemPageContent() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success("OTP resent! Check your phone for the new SMS.");
+        setResendPending(true); // keep success UI visible, poll in background
+        toast.success("OTP resent! Waiting for new SMS...");
       } else {
         toast.error(data.message ?? "Could not resend OTP.");
       }
@@ -463,21 +470,56 @@ function RedeemPageContent() {
     }
   }, [activeClaim]);
 
-  // Countdown timer for both email and OTP waiting phases
+  // Countdown timer for waiting and success phases
   useEffect(() => {
-    if ((claimState !== "waiting_otp" && claimState !== "waiting_email") || !activeClaim || !expiresAt) return;
+    const isActive = claimState === "waiting_otp" || claimState === "waiting_email" || claimState === "success";
+    if (!isActive || !activeClaim || !expiresAt) return;
 
     const interval = setInterval(() => {
       const nextLeft = expiresAt - Date.now();
       setTimeLeftMs(nextLeft);
       if (nextLeft <= 0) {
         clearInterval(interval);
-        cancelClaim("expired");
+        if (claimState === "success") {
+          // Timer expired after OTP received — just stop the timer, don't cancel the claim
+          setTimeLeftMs(0);
+          setExpiresAt(null);
+        } else {
+          cancelClaim("expired");
+        }
       }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [cancelClaim, claimState, activeClaim, expiresAt]);
+
+  // Poll for new OTP after resend (stays in success state, no UI flash)
+  useEffect(() => {
+    if (!resendPending || claimState !== "success" || !activeClaim) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const response = await fetch("/api/claim/otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ claimId: activeClaim.claimId })
+        });
+        const data = await response.json();
+        if (!response.ok) return;
+        if (data.status === "success" && data.otp) {
+          setOtp(data.otp);
+          setResendPending(false);
+          toast.success("New OTP received.");
+          clearInterval(poll);
+        } else if (data.status === "cancelled" || data.status === "expired") {
+          setResendPending(false);
+          clearInterval(poll);
+        }
+      } catch { /* ignore */ }
+    }, OTP_POLL_INTERVAL_MS);
+
+    return () => clearInterval(poll);
+  }, [resendPending, claimState, activeClaim]);
 
   useEffect(() => {
     if (claimState !== "waiting_otp" || !activeClaim) return;
@@ -496,10 +538,9 @@ function RedeemPageContent() {
         if (data.status === "success" && data.otp) {
           setOtp(data.otp);
           setClaimState("success");
-          setActiveClaim((prev) => prev ? { ...prev } : null);
-          setTimeLeftMs(0);
-          setExpiresAt(null);
-          clearActiveClaimId();
+          // Keep activeClaim, expiresAt and localStorage claim ID so:
+          // - timer keeps showing how long resend is available
+          // - other devices/sessions can restore this claim
           toast.success("OTP received.");
           clearInterval(poll);
           return;
@@ -568,12 +609,13 @@ function RedeemPageContent() {
           setOtp(data.otp);
           setEmailOtp(data.emailOtp ?? null);
           setClaimState("success");
-          // For email-based claims (CBTL, Luckin): restore activeClaim so credentials display persists across refresh
-          if (data.emailAddress) {
+          // Restore activeClaim for both email and SMS success claims
+          const stillActive = data.expiresAt > Date.now();
+          if (data.emailAddress || stillActive) {
             setActiveClaim({
               claimId: data.claimId,
               phoneNumber: data.phoneNumber ?? "",
-              emailAddress: data.emailAddress,
+              emailAddress: data.emailAddress ?? null,
               emailOtp: data.emailOtp ?? null,
               accountPassword: data.accountPassword ?? null,
               productName: data.productName || "Product",
@@ -581,6 +623,10 @@ function RedeemPageContent() {
               expiresAt: data.expiresAt
             });
             setActiveClaimId(data.claimId);
+            if (stillActive) {
+              setExpiresAt(data.expiresAt);
+              setTimeLeftMs(data.expiresAt - Date.now());
+            }
           } else {
             clearActiveClaimId();
           }
@@ -958,6 +1004,20 @@ function RedeemPageContent() {
 
                 {/* Active Claim Display */}
                 <AnimatePresence>
+                  {claimState === "claiming" && claimingProduct && !activeClaim && (
+                    <motion.div
+                      key="claiming-loading"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="border-l-4 border-violet-500 bg-slate-100 p-4 dark:bg-slate-800/50"
+                    >
+                      <p className="text-xs uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                        {claimingProduct.productName} — Allocating Number...
+                      </p>
+                      <p className="mt-3 animate-pulse text-sm text-slate-500 dark:text-slate-400">Please wait...</p>
+                    </motion.div>
+                  )}
                   {activeClaim && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -976,7 +1036,7 @@ function RedeemPageContent() {
                           <div className="mt-1 flex items-center justify-between">
                             <p className="text-lg font-bold text-slate-900 dark:text-white">{activeClaim.emailAddress}</p>
                             <button
-                              onClick={() => navigator.clipboard.writeText(activeClaim.emailAddress ?? "")}
+                              onClick={() => copyToClipboard(activeClaim.emailAddress ?? "", "email")}
                               className="p-2 text-slate-400 transition hover:text-cyan-600"
                               title="Copy email"
                             >
@@ -993,7 +1053,7 @@ function RedeemPageContent() {
                           <div className="mt-1 flex items-center justify-between">
                             <p className="text-lg font-bold text-slate-900 dark:text-white">{activeClaim.accountPassword}</p>
                             <button
-                              onClick={() => navigator.clipboard.writeText(activeClaim.accountPassword ?? "")}
+                              onClick={() => copyToClipboard(activeClaim.accountPassword ?? "", "password")}
                               className="p-2 text-slate-400 transition hover:text-cyan-600"
                               title="Copy password"
                             >
@@ -1014,7 +1074,7 @@ function RedeemPageContent() {
                           <div className="mt-1 flex items-center justify-between">
                             <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{emailOtp}</p>
                             <button
-                              onClick={() => navigator.clipboard.writeText(emailOtp)}
+                              onClick={() => copyToClipboard(emailOtp, "Email OTP")}
                               className="p-2 text-slate-400 transition hover:text-emerald-600"
                               title="Copy Email OTP"
                             >
@@ -1044,7 +1104,7 @@ function RedeemPageContent() {
                           <div className="mt-1 flex items-center justify-between">
                             <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeClaim.phoneNumber?.replace(/^6/, "")}</p>
                             <button
-                              onClick={() => navigator.clipboard.writeText(activeClaim.phoneNumber?.replace(/^6/, "") ?? "")}
+                              onClick={() => copyToClipboard(activeClaim.phoneNumber?.replace(/^6/, "") ?? "", "phone number")}
                               className="p-2 text-slate-400 transition hover:text-cyan-600"
                               title="Copy number"
                             >
@@ -1131,24 +1191,37 @@ function RedeemPageContent() {
                           animate={{ opacity: 1 }}
                           className="mt-3 border-l-4 border-cyan-500 bg-white p-3 dark:bg-slate-900"
                         >
-                          <p className="text-xs uppercase tracking-widest text-cyan-600 dark:text-cyan-400">OTP</p>
-                          <div className="mt-1 flex items-center justify-between">
-                            <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{otp}</p>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(otp)}
-                              className="p-2 text-slate-400 transition hover:text-cyan-600"
-                              title="Copy OTP"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                            </button>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs uppercase tracking-widest text-cyan-600 dark:text-cyan-400">OTP</p>
+                            {timeLeftMs > 0 && (
+                              <span className="text-xs text-slate-500 dark:text-slate-400">Resend available for <span className="font-mono font-semibold text-cyan-600 dark:text-cyan-400">{countdownLabel}</span></span>
+                            )}
                           </div>
-                          <button
-                            onClick={resendSmsOtp}
-                            disabled={resendingSmsOtp}
-                            className="mt-3 w-full border border-cyan-500/50 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-500/20 disabled:opacity-50 dark:text-cyan-400"
-                          >
-                            {resendingSmsOtp ? "Resending..." : "OTP expired? Resend SMS OTP"}
-                          </button>
+                          <div className="mt-1 flex items-center justify-between">
+                            {resendPending ? (
+                              <p className="animate-pulse text-lg font-semibold text-slate-400 dark:text-slate-500">Waiting for new SMS...</p>
+                            ) : (
+                              <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{otp}</p>
+                            )}
+                            {!resendPending && (
+                              <button
+                                onClick={() => copyToClipboard(otp, "OTP")}
+                                className="p-2 text-slate-400 transition hover:text-cyan-600"
+                                title="Copy OTP"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                              </button>
+                            )}
+                          </div>
+                          {timeLeftMs > 0 && !resendPending && (
+                            <button
+                              onClick={resendSmsOtp}
+                              disabled={resendingSmsOtp}
+                              className="mt-3 w-full border border-cyan-500/50 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-500/20 disabled:opacity-50 dark:text-cyan-400"
+                            >
+                              {resendingSmsOtp ? "Resending..." : "OTP expired? Resend SMS OTP"}
+                            </button>
+                          )}
                         </motion.div>
                       )}
                     </motion.div>
@@ -1189,7 +1262,7 @@ function RedeemPageContent() {
                           <div className="flex items-center gap-2">
                             <span className="text-lg font-bold text-cyan-600 dark:text-cyan-400">{claim.otp}</span>
                             <button
-                              onClick={() => navigator.clipboard.writeText(claim.otp!)}
+                              onClick={() => copyToClipboard(claim.otp!, "OTP")}
                               className="p-1.5 text-slate-400 transition hover:text-cyan-600"
                               title="Copy OTP"
                             >
@@ -1202,7 +1275,7 @@ function RedeemPageContent() {
                               <span className="text-xs text-slate-500 dark:text-slate-400">Password:</span>
                               <span className="font-mono text-sm font-bold text-cyan-600 dark:text-cyan-400">{claim.luckinAccount.password}</span>
                               <button
-                                onClick={() => navigator.clipboard.writeText(claim.luckinAccount!.password)}
+                                onClick={() => copyToClipboard(claim.luckinAccount!.password, "password")}
                                 className="p-1 text-slate-400 transition hover:text-cyan-600"
                                 title="Copy password"
                               >

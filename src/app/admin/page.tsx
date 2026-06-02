@@ -534,6 +534,333 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
+      {/* Account Pools Link */}
+      <div className="mt-6 border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Account Pools</h2>
+            <p className="mt-0.5 text-xs text-slate-400">Manage CBTL Email Pool and Luckin Coffee Account Pool</p>
+          </div>
+          <a
+            href="/admin/pools"
+            className="bg-cyan-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cyan-600 dark:text-slate-950 dark:hover:bg-cyan-400"
+          >
+            Manage Pools
+          </a>
+        </div>
+      </div>
+
+      
+
+      {/* Add Order */}
+      <div className="mt-6 border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Add Order</h2>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div>
+            <label className="text-xs text-slate-500">Product</label>
+            <select
+              value={newProductKey}
+              onChange={(e) => setNewProductKey(e.target.value)}
+              className="mt-1 block w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            >
+              {PRODUCT_OPTIONS.map((p) => (
+                <option key={p.key} value={p.key}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Quantity</label>
+            <input
+              type="number"
+              min={1}
+              value={newQuantity}
+              onChange={(e) => setNewQuantity(parseInt(e.target.value, 10) || 1)}
+              className="mt-1 block w-24 border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+          <button
+            onClick={addToCart}
+            className="border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-600 transition hover:bg-cyan-50 dark:border-cyan-400 dark:text-cyan-400 dark:hover:bg-cyan-950"
+          >
+            Add to Cart
+          </button>
+          <button
+            onClick={addOrder}
+            disabled={addingOrder || cart.length === 0}
+            className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60 dark:text-slate-950 dark:hover:bg-cyan-400"
+          >
+            {addingOrder ? "Creating..." : `Create Order (${cart.length} items)`}
+          </button>
+        </div>
+
+        {/* Cart Display */}
+        {cart.length > 0 && (
+          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <p className="text-xs text-slate-500">Cart Items:</p>
+            <div className="mt-2 space-y-2">
+              {cart.map((item) => (
+                <div key={item.productKey} className="flex items-center justify-between rounded bg-slate-50 px-3 py-2 dark:bg-slate-800">
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{item.productName}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateCartQuantity(item.productKey, -1)}
+                      className="h-6 w-6 border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center text-sm">{item.quantity}</span>
+                    <button
+                      onClick={() => updateCartQuantity(item.productKey, 1)}
+                      className="h-6 w-6 border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400"
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={() => removeFromCart(item.productKey)}
+                      className="ml-2 p-1 text-red-500 hover:text-red-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Orders Table */}
+      <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between p-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {orderSearch.trim()
+                ? `${orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())).length} of ${orders.length} total`
+                : `${orders.length} total`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <input
+                type="text"
+                value={orderSearch}
+                onChange={(e) => {
+                  setOrderSearch(e.target.value);
+                  setOrdersPage(1);
+                }}
+                placeholder="Search order ID..."
+                className="w-48 border border-slate-300 bg-white pr-7 pl-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              />
+              {orderSearch && (
+                <button
+                  onClick={() => {
+                    setOrderSearch("");
+                    setOrdersPage(1);
+                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  aria-label="Clear search"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              )}
+            </div>
+            <button
+              onClick={fetchOrders}
+              disabled={ordersLoading}
+              className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
+              <tr>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Order ID</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Products</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Total Qty</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Claims</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Created</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordersLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">Loading...</td>
+                </tr>
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
+                </tr>
+              ) : (
+                (orderSearch.trim()
+                  ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
+                  : orders
+                ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
+                  <tr key={order.orderId} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="px-4 py-2">
+                      {editingOrder === order.orderId ? (
+                        <input
+                          value={editOrderId}
+                          onChange={(e) => setEditOrderId(e.target.value)}
+                          className="w-full border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-slate-900 dark:text-white">{order.orderId}</span>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(order.orderId).then(() => toast.success("Copied order ID"))}
+                            className="text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400"
+                            title="Copy order ID"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {order.isCartOrder && order.items && order.items.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="text-sm text-slate-700 dark:text-slate-300">
+                              {item.productName} x{item.quantity}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-700 dark:text-slate-300">{order.productName}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editingOrder === order.orderId ? (
+                        <input
+                          type="number"
+                          min={0}
+                          value={editQuantity}
+                          onChange={(e) => setEditQuantity(parseInt(e.target.value, 10) || 0)}
+                          className="w-20 border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                        />
+                      ) : (
+                        <span className="text-cyan-600 dark:text-cyan-400">{order.quantity}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`inline-block px-2 py-0.5 text-xs font-medium ${
+                          order.status === "active"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-red-500/10 text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-slate-500">{order._count.claims}</td>
+                    <td className="px-4 py-2 text-xs text-slate-500">
+                      {new Date(order.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editingOrder === order.orderId ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => saveEdit(order.orderId)}
+                            disabled={savingOrder}
+                            className="text-xs font-medium text-emerald-600 transition hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
+                          >
+                            {savingOrder ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="text-xs text-slate-500 transition hover:text-slate-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => startEdit(order)}
+                            className="text-xs text-cyan-600 transition hover:text-cyan-500 dark:text-cyan-400"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteOrder(order.orderId)}
+                            className="text-xs text-red-500 transition hover:text-red-400"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination */}
+        {(() => {
+          const filteredOrders = orderSearch.trim()
+            ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
+            : orders;
+          const totalPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
+          if (filteredOrders.length <= ORDERS_PER_PAGE) return null;
+          return (
+            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+              <p className="text-xs text-slate-500">
+                Page {ordersPage} of {totalPages} · showing {Math.min(ordersPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setOrdersPage(1)}
+                  disabled={ordersPage === 1}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >«</button>
+                <button
+                  onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                  disabled={ordersPage === 1}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >‹ Prev</button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let start = Math.max(1, ordersPage - 2);
+                  if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
+                  const page = start + i;
+                  if (page > totalPages) return null;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setOrdersPage(page)}
+                      className={`px-2.5 py-1 text-xs ${
+                        page === ordersPage
+                          ? "bg-cyan-500 font-semibold text-white"
+                          : "text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setOrdersPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={ordersPage === totalPages}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >Next ›</button>
+                <button
+                  onClick={() => setOrdersPage(totalPages)}
+                  disabled={ordersPage === totalPages}
+                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+                >»</button>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
       {/* Product Prices - Collapsible */}
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <button
@@ -789,321 +1116,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         ))}
       </div>
 
-      {/* Add Order */}
-      <div className="mt-6 border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Add Order</h2>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div>
-            <label className="text-xs text-slate-500">Product</label>
-            <select
-              value={newProductKey}
-              onChange={(e) => setNewProductKey(e.target.value)}
-              className="mt-1 block w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            >
-              {PRODUCT_OPTIONS.map((p) => (
-                <option key={p.key} value={p.key}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-500">Quantity</label>
-            <input
-              type="number"
-              min={1}
-              value={newQuantity}
-              onChange={(e) => setNewQuantity(parseInt(e.target.value, 10) || 1)}
-              className="mt-1 block w-24 border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            />
-          </div>
-          <button
-            onClick={addToCart}
-            className="border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-600 transition hover:bg-cyan-50 dark:border-cyan-400 dark:text-cyan-400 dark:hover:bg-cyan-950"
-          >
-            Add to Cart
-          </button>
-          <button
-            onClick={addOrder}
-            disabled={addingOrder || cart.length === 0}
-            className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60 dark:text-slate-950 dark:hover:bg-cyan-400"
-          >
-            {addingOrder ? "Creating..." : `Create Order (${cart.length} items)`}
-          </button>
-        </div>
-
-        {/* Cart Display */}
-        {cart.length > 0 && (
-          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
-            <p className="text-xs text-slate-500">Cart Items:</p>
-            <div className="mt-2 space-y-2">
-              {cart.map((item) => (
-                <div key={item.productKey} className="flex items-center justify-between rounded bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{item.productName}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => updateCartQuantity(item.productKey, -1)}
-                      className="h-6 w-6 border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400"
-                    >
-                      -
-                    </button>
-                    <span className="w-8 text-center text-sm">{item.quantity}</span>
-                    <button
-                      onClick={() => updateCartQuantity(item.productKey, 1)}
-                      className="h-6 w-6 border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeFromCart(item.productKey)}
-                      className="ml-2 p-1 text-red-500 hover:text-red-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Orders Table */}
-      <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
-            <p className="mt-0.5 text-xs text-slate-400">
-              {orderSearch.trim()
-                ? `${orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())).length} of ${orders.length} total`
-                : `${orders.length} total`}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <input
-                type="text"
-                value={orderSearch}
-                onChange={(e) => {
-                  setOrderSearch(e.target.value);
-                  setOrdersPage(1);
-                }}
-                placeholder="Search order ID..."
-                className="w-48 border border-slate-300 bg-white pr-7 pl-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-              />
-              {orderSearch && (
-                <button
-                  onClick={() => {
-                    setOrderSearch("");
-                    setOrdersPage(1);
-                  }}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  aria-label="Clear search"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-              )}
-            </div>
-            <button
-              onClick={fetchOrders}
-              disabled={ordersLoading}
-              className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Order ID</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Products</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Total Qty</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Claims</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Created</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ordersLoading ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">Loading...</td>
-                </tr>
-              ) : orders.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
-                </tr>
-              ) : (
-                (orderSearch.trim()
-                  ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
-                  : orders
-                ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
-                  <tr key={order.orderId} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-4 py-2">
-                      {editingOrder === order.orderId ? (
-                        <input
-                          value={editOrderId}
-                          onChange={(e) => setEditOrderId(e.target.value)}
-                          className="w-full border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                        />
-                      ) : (
-                        <span className="font-mono text-xs text-slate-900 dark:text-white">{order.orderId}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {order.isCartOrder && order.items && order.items.length > 0 ? (
-                        <div className="space-y-0.5">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="text-sm text-slate-700 dark:text-slate-300">
-                              {item.productName} x{item.quantity}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-700 dark:text-slate-300">{order.productName}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {editingOrder === order.orderId ? (
-                        <input
-                          type="number"
-                          min={0}
-                          value={editQuantity}
-                          onChange={(e) => setEditQuantity(parseInt(e.target.value, 10) || 0)}
-                          className="w-20 border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                        />
-                      ) : (
-                        <span className="text-cyan-600 dark:text-cyan-400">{order.quantity}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-block px-2 py-0.5 text-xs font-medium ${
-                          order.status === "active"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : "bg-red-500/10 text-red-600 dark:text-red-400"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-slate-500">{order._count.claims}</td>
-                    <td className="px-4 py-2 text-xs text-slate-500">
-                      {new Date(order.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2">
-                      {editingOrder === order.orderId ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => saveEdit(order.orderId)}
-                            disabled={savingOrder}
-                            className="text-xs font-medium text-emerald-600 transition hover:text-emerald-500 disabled:opacity-50 dark:text-emerald-400"
-                          >
-                            {savingOrder ? "Saving..." : "Save"}
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="text-xs text-slate-500 transition hover:text-slate-400"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => startEdit(order)}
-                            className="text-xs text-cyan-600 transition hover:text-cyan-500 dark:text-cyan-400"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteOrder(order.orderId)}
-                            className="text-xs text-red-500 transition hover:text-red-400"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {/* Pagination */}
-        {(() => {
-          const filteredOrders = orderSearch.trim()
-            ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
-            : orders;
-          const totalPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
-          if (filteredOrders.length <= ORDERS_PER_PAGE) return null;
-          return (
-            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-              <p className="text-xs text-slate-500">
-                Page {ordersPage} of {totalPages} · showing {Math.min(ordersPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setOrdersPage(1)}
-                  disabled={ordersPage === 1}
-                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-                >«</button>
-                <button
-                  onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
-                  disabled={ordersPage === 1}
-                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-                >‹ Prev</button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let start = Math.max(1, ordersPage - 2);
-                  if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
-                  const page = start + i;
-                  if (page > totalPages) return null;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setOrdersPage(page)}
-                      className={`px-2.5 py-1 text-xs ${
-                        page === ordersPage
-                          ? "bg-cyan-500 font-semibold text-white"
-                          : "text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => setOrdersPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={ordersPage === totalPages}
-                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-                >Next ›</button>
-                <button
-                  onClick={() => setOrdersPage(totalPages)}
-                  disabled={ordersPage === totalPages}
-                  className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
-                >»</button>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* Account Pools Link */}
-      <div className="mt-6 border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Account Pools</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Manage CBTL Email Pool and Luckin Coffee Account Pool</p>
-          </div>
-          <a
-            href="/admin/pools"
-            className="bg-cyan-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cyan-600 dark:text-slate-950 dark:hover:bg-cyan-400"
-          >
-            Manage Pools
-          </a>
-        </div>
-      </div>
+      
     </main>
   );
 }

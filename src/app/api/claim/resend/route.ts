@@ -23,17 +23,24 @@ export async function POST(request: Request) {
   }
 
   if (!claim.heroActivationId) {
-    return NextResponse.json({ message: "No HeroSMS activation found for this claim." }, { status: 422 });
+    return NextResponse.json({ message: "No activation found for this claim." }, { status: 422 });
   }
 
   try {
     const result = await resendOtp(claim.heroActivationId);
     if (!result.success) {
       return NextResponse.json(
-        { message: `HeroSMS resend failed: ${result.raw}` },
+        { message: `Resend failed: ${result.raw}` },
         { status: 502 }
       );
     }
+
+    // Reset claim so the OTP poller fetches a fresh OTP from HeroSMS
+    await prisma.claim.update({
+      where: { claimId },
+      data: { status: "waiting_otp", otp: null }
+    });
+
     return NextResponse.json({ message: "OTP resend requested successfully." });
   } catch (err) {
     return NextResponse.json(
