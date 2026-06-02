@@ -613,7 +613,7 @@ export default function CbtlRegisterPage() {
               disabled={!activeEmailId || activating}
               className="w-full bg-emerald-500 py-3 text-sm font-bold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-emerald-400"
             >
-              {activating ? "Activating..." : "✓ Mark as Done — Set Available (+14 day expiry)"}
+              {activating ? "Activating..." : "✓ Done"}
             </button>
           </div>
         </div>
