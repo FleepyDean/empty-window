@@ -79,6 +79,7 @@ function RedeemPageContent() {
 
   const [infoModalProduct, setInfoModalProduct] = useState<ProductConfig | null>(null);
   const [voucherImageModal, setVoucherImageModal] = useState<string | null>(null);
+  const [voucherConfirmModal, setVoucherConfirmModal] = useState<{ url: string; productKey: string } | null>(null);
   const [productInstructions, setProductInstructions] = useState<Record<string, string>>({});
   const [productVideos, setProductVideos] = useState<Record<string, string>>({});
 
@@ -1079,16 +1080,18 @@ function RedeemPageContent() {
                       {/* Voucher Image Display (for image-type products like Tealive) */}
                       {activeClaim.voucherImageUrl && (
                         <div className="mt-4">
-                          <div className="rounded-lg border-2 border-emerald-500 bg-white p-2 shadow-lg dark:bg-slate-900">
-                            <img
-                              src={activeClaim.voucherImageUrl}
-                              alt={`${activeClaim.productName} Voucher`}
-                              className="mx-auto max-h-[70vh] w-full rounded object-contain"
-                            />
-                          </div>
-                          <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
-                            Screenshot this voucher and show it to the Tearista
-                          </p>
+                          <button
+                            onClick={() => setVoucherConfirmModal({ url: activeClaim.voucherImageUrl!, productKey: activeClaim.productKey })}
+                            className="w-full rounded-lg border-2 border-amber-500 bg-amber-500/10 px-6 py-4 text-center transition hover:bg-amber-500/20 dark:border-amber-500 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+                          >
+                            <div className="flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                              <span className="font-bold">View Voucher</span>
+                            </div>
+                            <p className="mt-1 text-xs text-amber-600/80 dark:text-amber-400/80">
+                              Click to confirm redemption locations
+                            </p>
+                          </button>
                         </div>
                       )}
 
@@ -1316,7 +1319,7 @@ function RedeemPageContent() {
                           <div className="flex flex-col items-end gap-1">
                             <span className="text-xs text-emerald-600 dark:text-emerald-400">Voucher assigned</span>
                             <button
-                              onClick={() => setVoucherImageModal(claim.voucherImageUrl!)}
+                              onClick={() => setVoucherConfirmModal({ url: claim.voucherImageUrl!, productKey: claim.productKey })}
                               className="text-xs text-cyan-600 underline hover:text-cyan-500 dark:text-cyan-400"
                             >
                               View Voucher
@@ -1364,6 +1367,58 @@ function RedeemPageContent() {
             </div>
             <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
               {infoModalProduct.redemptionInstructions}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voucher Confirmation Modal */}
+      {voucherConfirmModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setVoucherConfirmModal(null)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto border-2 border-amber-500 bg-white p-6 shadow-2xl dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              <h3 className="text-lg font-bold">Important: Redemption Locations</h3>
+            </div>
+
+            <div className="mt-4 space-y-3 text-sm text-slate-700 dark:text-slate-300">
+              <p className="font-medium text-emerald-600 dark:text-emerald-400">
+                ✅ This voucher is redeemable at ALL Tealive outlets EXCEPT:
+              </p>
+              <ul className="ml-4 list-disc space-y-1 text-red-600 dark:text-red-400">
+                <li>KLIA2</li>
+                <li>KIDZANIA</li>
+                <li>JOHOR PREMIUM OUTLETS</li>
+                <li>MAXVALU</li>
+                <li>AEON DELICA (Tealive Kiosk inside Aeon&apos;s Food Court)</li>
+              </ul>
+              <p className="mt-4 text-xs text-slate-500">
+                By clicking &quot;I Understand, Show Voucher&quot;, you acknowledge that you have read and understood these redemption restrictions. The voucher will NOT work at the excluded locations listed above.
+              </p>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setVoucherConfirmModal(null)}
+                className="flex-1 border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setVoucherImageModal(voucherConfirmModal.url);
+                  setVoucherConfirmModal(null);
+                }}
+                className="flex-1 border border-amber-500 bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
+              >
+                I Understand, Show Voucher
+              </button>
             </div>
           </div>
         </div>
