@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { cleanupExpiredClaims } from "@/lib/claim-cleanup";
 import { assignEmailToClaim } from "@/lib/email-pool";
 import { assignLuckinAccountToClaim } from "@/lib/luckin-pool";
+import { assignVoucherImageToClaim } from "@/lib/voucher-pool";
+import { PRODUCT_MAP } from "@/lib/products";
 import { NextResponse } from "next/server";
 
 const CBTL_PRODUCT_KEY = "cbtl";
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
 
   const isEmailFirst = productKey === CBTL_PRODUCT_KEY;
   const isAccountProduct = productKey === LUCKIN_PRODUCT_KEY;
+  const isImageProduct = PRODUCT_MAP[productKey as keyof typeof PRODUCT_MAP]?.productType === "image";
 
   if (!canClaim) {
     return NextResponse.json({ message: "Cannot claim - no remaining quantity." }, { status: 409 });
@@ -289,6 +292,113 @@ export async function POST(request: Request) {
         phoneNumber: null,
         emailAddress: account.email,
         accountPassword: account.password,
+        expiresAt: Date.now() + FIFTEEN_MINUTES_MS,
+        productName
+      });
+    }
+
+    if (isImageProduct) {
+      // Image-based products (Tealive vouchers): assign image immediately, no OTP needed
+      const newClaimId = buildClaimId();
+
+      // Deduct quantity + create claim shell
+      await prisma.$transaction(async (tx) => {
+        if (targetItemId) {
+          const orderItem = await tx.orderItem.findUnique({ where: { id: targetItemId } });
+          if (!orderItem || orderItem.remainingQty <= 0) {
+            throw new Error("Product depleted during claim process.");
+          }
+          await tx.orderItem.update({
+            where: { id: targetItemId },
+            data: { remainingQty: orderItem.remainingQty - 1 }
+          });
+        } else {
+          const ord = await tx.order.findUnique({ where: { orderId: trimmedOrderId } });
+          if (!ord || ord.quantity <= 0) {
+            throw new Error("Order depleted during claim process.");
+          }
+          await tx.order.update({
+            where: { orderId: trimmedOrderId },
+            data: { quantity: ord.quantity - 1 }
+          });
+        }
+
+        await tx.claim.create({
+          data: {
+            claimId: newClaimId,
+            orderId: trimmedOrderId,
+            orderItemId: targetItemId,
+            expiresAt: new Date(Date.now() + FIFTEEN_MINUTES_MS),
+            status: "waiting_otp",
+            quantityDeducted: true
+          }
+        });
+      });
+
+      // Reserve a voucher image from the pool
+      const voucherImage = await assignVoucherImageToClaim(newClaimId, productKey);
+      if (!voucherImage) {
+        // Rollback: restore quantity and delete the claim shell
+        await prisma.$transaction(async (tx) => {
+          await tx.claim.delete({ where: { claimId: newClaimId } }).catch(() => {});
+          if (targetItemId) {
+            const oi = await tx.orderItem.findUnique({ where: { id: targetItemId } });
+            if (oi) {
+              await tx.orderItem.update({
+                where: { id: targetItemId },
+                data: { remainingQty: oi.remainingQty + 1 }
+              });
+            }
+          } else {
+            const ord = await tx.order.findUnique({ where: { orderId: trimmedOrderId } });
+            if (ord) {
+              await tx.order.update({
+                where: { orderId: trimmedOrderId },
+                data: { quantity: ord.quantity + 1 }
+              });
+            }
+          }
+        });
+        return NextResponse.json(
+          { message: "No voucher images available in the pool. Please contact support." },
+          { status: 503 }
+        );
+      }
+
+      // Update claim to success
+      await prisma.claim.update({
+        where: { claimId: newClaimId },
+        data: { status: "success" }
+      });
+
+      // Check if order should be marked as depleted
+      if (targetItemId) {
+        const orderItem = await prisma.orderItem.findUnique({ where: { id: targetItemId } });
+        if (orderItem && orderItem.remainingQty <= 0) {
+          const allItems = await prisma.orderItem.findMany({ where: { orderId: trimmedOrderId } });
+          const allDepleted = allItems.every((i) => i.remainingQty <= 0);
+          if (allDepleted) {
+            await prisma.order.update({
+              where: { orderId: trimmedOrderId },
+              data: { status: "depleted" }
+            });
+          }
+        }
+      } else {
+        const order = await prisma.order.findUnique({ where: { orderId: trimmedOrderId } });
+        if (order && order.quantity <= 0) {
+          await prisma.order.update({
+            where: { orderId: trimmedOrderId },
+            data: { status: "depleted" }
+          });
+        }
+      }
+
+      return NextResponse.json({
+        claimId: newClaimId,
+        phoneNumber: null,
+        emailAddress: null,
+        voucherImageUrl: voucherImage.imageUrl,
         expiresAt: Date.now() + FIFTEEN_MINUTES_MS,
         productName
       });

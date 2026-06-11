@@ -14,6 +14,8 @@ export function matchProductByKeyword(rawName: string): ProductConfig | null {
     { keywords: ["gigi"], key: "gigi" },
     { keywords: ["zus"], key: "zus" },
     { keywords: ["chagee", "cha gee"], key: "chagee" },
+    { keywords: ["tealive rm5", "tealive voucher rm5"], key: "tealive_rm5" },
+    { keywords: ["tealive buy 1 free 1", "tealive b1f1", "tealive buy1free1"], key: "tealive_b1f1" },
     { keywords: ["tealive", "tea live"], key: "tealive" },
     { keywords: ["kfc", "kentucky"], key: "kfc" },
     { keywords: ["winrar", "win rar"], key: "winrar" },

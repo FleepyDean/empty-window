@@ -14,7 +14,8 @@ export async function POST(request: Request) {
     include: {
       orderItem: true,
       order: true,
-      luckinAccount: true
+      luckinAccount: true,
+      voucherImage: true
     }
   });
   if (!claim) {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     // Refetch with relations for product info
     const expiredClaimWithRelations = await prisma.claim.findUnique({
       where: { claimId },
-      include: { orderItem: true, order: true, luckinAccount: true }
+      include: { orderItem: true, order: true, luckinAccount: true, voucherImage: true }
     });
 
     return NextResponse.json({
@@ -84,7 +85,8 @@ export async function POST(request: Request) {
       otp: expiredClaimWithRelations!.otp,
       productKey: expiredClaimWithRelations!.orderItem?.productKey ?? expiredClaimWithRelations!.order?.productKey ?? null,
       productName: expiredClaimWithRelations!.orderItem?.productName ?? expiredClaimWithRelations!.order?.productName ?? null,
-      accountPassword: expiredClaimWithRelations!.luckinAccount?.password ?? null
+      accountPassword: expiredClaimWithRelations!.luckinAccount?.password ?? null,
+      voucherImageUrl: expiredClaimWithRelations!.voucherImage?.imageUrl ?? null
     });
   }
 
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
     otp: claim.otp,
     productKey: claim.orderItem?.productKey ?? claim.order?.productKey ?? null,
     productName: claim.orderItem?.productName ?? claim.order?.productName ?? null,
-    accountPassword: claim.luckinAccount?.password ?? null
+    accountPassword: claim.luckinAccount?.password ?? null,
+    voucherImageUrl: claim.voucherImage?.imageUrl ?? null
   });
 }

@@ -175,6 +175,8 @@ const PRODUCT_OPTIONS = [
   { key: "zus", name: "ZUS Coffee" },
   { key: "chagee", name: "Chagee" },
   { key: "tealive", name: "Tealive" },
+  { key: "tealive_rm5", name: "Tealive RM5 Voucher" },
+  { key: "tealive_b1f1", name: "Tealive Buy 1 Free 1 Voucher" },
   { key: "gigi", name: "Gigi Coffee" },
   { key: "luckin", name: "Luckin Coffee" },
   { key: "winrar", name: "WinRAR" },

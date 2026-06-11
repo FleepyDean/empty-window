@@ -23,13 +23,13 @@ export async function POST(request: Request) {
       items: {
         include: {
           claims: {
-            include: { luckinAccount: true },
+            include: { luckinAccount: true, voucherImage: true },
             orderBy: { createdAt: "desc" }
           }
         }
       },
       claims: {
-        include: { luckinAccount: true },
+        include: { luckinAccount: true, voucherImage: true },
         orderBy: { createdAt: "desc" }
       }
     }
@@ -93,7 +93,8 @@ export async function POST(request: Request) {
           luckinAccount: claim.luckinAccount ? {
             email: claim.luckinAccount.email,
             password: claim.luckinAccount.password
-          } : null
+          } : null,
+          voucherImageUrl: claim.voucherImage?.imageUrl ?? null
         }))
       )
     : order.claims.map((claim) => ({
@@ -110,7 +111,8 @@ export async function POST(request: Request) {
         luckinAccount: claim.luckinAccount ? {
           email: claim.luckinAccount.email,
           password: claim.luckinAccount.password
-        } : null
+        } : null,
+        voucherImageUrl: claim.voucherImage?.imageUrl ?? null
       }));
 
   // Sort claims by date descending

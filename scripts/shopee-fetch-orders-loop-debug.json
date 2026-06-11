@@ -1,0 +1,30 @@
+{
+  "Name": "shopee-fetch-orders-loop-debug",
+  "CreationDate": "2026-5-4",
+  "Commands": [
+    {
+      "Command": "executeScript",
+      "Target": "window.location.reload();",
+      "Value": "",
+      "Description": "Refresh page to get latest orders"
+    },
+    {
+      "Command": "pause",
+      "Target": "4000",
+      "Value": "",
+      "Description": "Wait for page reload"
+    },
+    {
+      "Command": "executeScript",
+      "Target": "var API_BASE = 'https://nishinae.store'; var body = document.body ? document.body.innerText : ''; var KEYWORDS = /zus|chagee|tealive|kfc|coffee bean|cbtl|gigi|winrar/i; var orderRe = /Order\\s*ID\\s*[:\\-]?\\s*([A-Z0-9]{10,})/gi; \n\n// Find all order matches with their positions\nvar orderMatches = [];\nvar m;\nwhile ((m = orderRe.exec(body)) !== null) {\n  orderMatches.push({ id: m[1], index: m.index });\n}\n\nif (orderMatches.length === 0) { return 'NO_ORDERS_FOUND'; }\n\nvar debugInfo = [];\nvar orders = [];\n\nfor (var i = 0; i < orderMatches.length; i++) {\n  var sid = orderMatches[i].id;\n  var start = orderMatches[i].index;\n  var end = i + 1 < orderMatches.length ? orderMatches[i + 1].index : body.length;\n  var section = body.substring(start, Math.min(body.length, end));\n  \n  // Debug: store first 500 chars of section\n  debugInfo.push('=== Order ' + sid + ' ===');\n  debugInfo.push('Section start: ' + start + ', end: ' + end);\n  \n  var lines = section.split(/[\\n\\r]+/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });\n  \n  debugInfo.push('Lines found: ' + lines.length);\n  \n  var items = [];\n  for (var j = 0; j < lines.length; j++) {\n    var line = lines[j];\n    \n    // Check for inline quantity format: Product Name xN\n    var inlineQty = line.match(/(.+?)\\s+x(\\d+)\\b/i);\n    if (inlineQty && KEYWORDS.test(inlineQty[1])) {\n      items.push({ productName: inlineQty[1].trim(), quantity: parseInt(inlineQty[2], 10) });\n      debugInfo.push('  [INLINE] Line ' + j + ': \"' + line.substring(0,30) + '...\" -> qty=' + parseInt(inlineQty[2], 10));\n      continue;\n    }\n    \n    // Check if line itself is a product keyword\n    if (KEYWORDS.test(line) && line.length > 8) {\n      var qty = 1;\n      var nextLine = j + 1 < lines.length ? lines[j + 1] : '';\n      \n      // Check for standalone quantity on next line\n      var standaloneQty = nextLine.match(/^x(\\d+)$/i);\n      if (standaloneQty) {\n        qty = parseInt(standaloneQty[1], 10);\n        j++;\n        debugInfo.push('  [STANDALONE] Line ' + j + ': \"' + line.substring(0,30) + '...\" + next=\"' + nextLine + '\" -> qty=' + qty);\n      } else {\n        // Check for trailing quantity in same line\n        var trailingQty = line.match(/x(\\d+)\\b/i);\n        if (trailingQty) {\n          qty = parseInt(trailingQty[1], 10);\n          debugInfo.push('  [TRAILING] Line ' + j + ': \"' + line.substring(0,30) + '...\" -> qty=' + qty);\n        } else {\n          debugInfo.push('  [NO QTY] Line ' + j + ': \"' + line.substring(0,30) + '...\" -> qty=1');\n        }\n      }\n      \n      // Check for duplicates\n      var alreadyAdded = false;\n      for (var k = 0; k < items.length; k++) {\n        if (items[k].productName.trim() === line.trim()) {\n          items[k].quantity += qty;\n          alreadyAdded = true;\n          debugInfo.push('    -> MERGED with existing, new qty=' + items[k].quantity);\n          break;\n        }\n      }\n      if (!alreadyAdded) {\n        items.push({ productName: line.trim(), quantity: qty });\n        debugInfo.push('    -> ADDED new item: ' + line.trim() + ' x' + qty);\n      }\n    }\n  }\n  \n  debugInfo.push('Items for ' + sid + ': ' + JSON.stringify(items));\n  \n  if (items.length > 0) {\n    orders.push({ shopeeOrderId: sid, items: items });\n  }\n}\n\nreturn JSON.stringify({ debug: debugInfo, orders: orders }, null, 2);",
+      "Value": "debugResult",
+      "Description": "Debug: Extract and analyze orders"
+    },
+    {
+      "Command": "echo",
+      "Target": "Debug Result: ${debugResult}",
+      "Value": "",
+      "Description": "Show debug output"
+    }
+  ]
+}

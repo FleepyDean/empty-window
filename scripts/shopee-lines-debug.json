@@ -1,0 +1,18 @@
+{
+  "Name": "shopee-lines-debug",
+  "CreationDate": "2026-6-3",
+  "Commands": [
+    {
+      "Command": "executeScript",
+      "Target": "var body=document.body?document.body.innerText:'';var KEYWORDS=/zus|chagee|tealive|kfc|coffee bean|cbtl|gigi|winrar/i;var orderRe=/Order\\s*ID\\s*[:\\-]?\\s*([A-Z0-9]{10,})/gi;var orderMatches=[];var m;while((m=orderRe.exec(body))!==null){orderMatches.push({id:m[1],index:m.index})}if(orderMatches.length===0){return'NO_ORDERS_FOUND'}var debug=[];for(var i=0;i<orderMatches.length;i++){var sid=orderMatches[i].id;var start=orderMatches[i].index;var end=i+1<orderMatches.length?orderMatches[i+1].index:body.length;var section=body.substring(start,Math.min(body.length,end));var lines=section.split(/[\\n\\r]+/).map(function(l){return l.trim()}).filter(function(l){return l.length>0});debug.push('=== Order '+sid+' ===');debug.push('Total lines: '+lines.length);for(var j=0;j<Math.min(lines.length,15);j++){var line=lines[j];var hasKeyword=KEYWORDS.test(line);var xMatch=line.match(/x\\d+/);debug.push('Line '+j+': ['+line.length+' chars] '+line.substring(0,80)+(hasKeyword?' [HAS KEYWORD]':'')+(xMatch?' [HAS xN:'+xMatch[0]+']':''))}}return JSON.stringify(debug,null,2);",
+      "Value": "debugResult",
+      "Description": "Debug all lines in each order"
+    },
+    {
+      "Command": "echo",
+      "Target": "${debugResult}",
+      "Value": "",
+      "Description": "Show line debug"
+    }
+  ]
+}

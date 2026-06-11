@@ -29,7 +29,7 @@ type OrderProduct = {
   remainingQty: number;
   canClaim: boolean;
   logoUrl: string;
-  productType: "otp" | "link" | "account";
+  productType: "otp" | "link" | "account" | "image";
   linkUrl: string | null;
   accountType?: "luckin";
 };
@@ -46,6 +46,7 @@ type ClaimHistoryItem = {
   createdAt: string;
   expiresAt: string;
   luckinAccount: { email: string; password: string } | null;
+  voucherImageUrl: string | null;
 };
 
 type ClaimPhase = "email" | "phone" | "otp" | null;
@@ -56,6 +57,7 @@ type ActiveClaim = {
   emailAddress: string | null;
   emailOtp: string | null;
   accountPassword?: string | null;
+  voucherImageUrl?: string | null;
   productName: string;
   productKey: string;
   expiresAt: number;
@@ -76,6 +78,7 @@ function RedeemPageContent() {
   const [activeTab, setActiveTab] = useState<"products" | "activations">("products");
 
   const [infoModalProduct, setInfoModalProduct] = useState<ProductConfig | null>(null);
+  const [voucherImageModal, setVoucherImageModal] = useState<string | null>(null);
   const [productInstructions, setProductInstructions] = useState<Record<string, string>>({});
   const [productVideos, setProductVideos] = useState<Record<string, string>>({});
 
@@ -315,12 +318,15 @@ function RedeemPageContent() {
       // Luckin: account-type product (email + password)
       const isAccountProduct = product.productType === "account";
 
+      const isImageProduct = product.productType === "image";
+
       setActiveClaim({
         claimId: data.claimId,
         phoneNumber: data.phoneNumber ?? "",
         emailAddress: data.emailAddress ?? null,
         emailOtp: data.emailOtp ?? null,
         accountPassword: data.accountPassword ?? null,
+        voucherImageUrl: data.voucherImageUrl ?? null,
         productName: product.productName,
         productKey: product.productKey,
         expiresAt: data.expiresAt ?? Date.now() + CLAIM_DURATION_MS
@@ -328,7 +334,12 @@ function RedeemPageContent() {
       setExpiresAt(data.expiresAt ?? Date.now() + CLAIM_DURATION_MS);
       setTimeLeftMs((data.expiresAt ?? Date.now() + CLAIM_DURATION_MS) - Date.now());
 
-      if (isAccountProduct && data.emailAddress) {
+      if (isImageProduct && data.voucherImageUrl) {
+        // Image-based product (Tealive vouchers) — show image immediately
+        setClaimState("success");
+        setOtp(null);
+        toast.success(`Voucher assigned for ${product.productName}. Show the image below to redeem.`);
+      } else if (isAccountProduct && data.emailAddress) {
         // Luckin account — show email + password immediately
         setClaimState("success");
         setOtp(null);
@@ -588,6 +599,7 @@ function RedeemPageContent() {
             emailAddress: data.emailAddress ?? null,
             emailOtp: data.emailOtp ?? null,
             accountPassword: data.accountPassword ?? null,
+            voucherImageUrl: data.voucherImageUrl ?? null,
             productName: data.productName || "Product",
             productKey: data.productKey || "unknown",
             expiresAt: data.expiresAt
@@ -611,13 +623,14 @@ function RedeemPageContent() {
           setClaimState("success");
           // Restore activeClaim for both email and SMS success claims
           const stillActive = data.expiresAt > Date.now();
-          if (data.emailAddress || stillActive) {
+          if (data.emailAddress || stillActive || data.voucherImageUrl) {
             setActiveClaim({
               claimId: data.claimId,
               phoneNumber: data.phoneNumber ?? "",
               emailAddress: data.emailAddress ?? null,
               emailOtp: data.emailOtp ?? null,
               accountPassword: data.accountPassword ?? null,
+              voucherImageUrl: data.voucherImageUrl ?? null,
               productName: data.productName || "Product",
               productKey: data.productKey || "unknown",
               expiresAt: data.expiresAt
@@ -993,7 +1006,7 @@ function RedeemPageContent() {
                               : claimState === "waiting_otp" && claimingProduct?.productKey === product.productKey
                                 ? "Waiting OTP..."
                                 : product.canClaim
-                                  ? (product.productType === "account" ? "Get Account" : product.productKey === "cbtl" ? "Get Email" : "Get Number")
+                                  ? (product.productType === "image" ? "Get Voucher" : product.productType === "account" ? "Get Account" : product.productKey === "cbtl" ? "Get Email" : "Get Number")
                                   : "0 left"}
                         </button>
                       </div>
@@ -1060,6 +1073,22 @@ function RedeemPageContent() {
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                             </button>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Voucher Image Display (for image-type products like Tealive) */}
+                      {activeClaim.voucherImageUrl && (
+                        <div className="mt-4">
+                          <div className="rounded-lg border-2 border-emerald-500 bg-white p-2 shadow-lg dark:bg-slate-900">
+                            <img
+                              src={activeClaim.voucherImageUrl}
+                              alt={`${activeClaim.productName} Voucher`}
+                              className="mx-auto max-h-[70vh] w-full rounded object-contain"
+                            />
+                          </div>
+                          <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+                            Screenshot this voucher and show it to the Tearista
+                          </p>
                         </div>
                       )}
 
@@ -1283,6 +1312,16 @@ function RedeemPageContent() {
                               </button>
                             </div>
                           </div>
+                        ) : claim.status === "success" && claim.voucherImageUrl ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400">Voucher assigned</span>
+                            <button
+                              onClick={() => setVoucherImageModal(claim.voucherImageUrl!)}
+                              className="text-xs text-cyan-600 underline hover:text-cyan-500 dark:text-cyan-400"
+                            >
+                              View Voucher
+                            </button>
+                          </div>
                         ) : claim.status === "cancelled" ? (
                           <span className="text-sm text-red-600 dark:text-red-400">Cancelled</span>
                         ) : claim.status === "expired" ? (
@@ -1326,6 +1365,34 @@ function RedeemPageContent() {
             <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
               {infoModalProduct.redemptionInstructions}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voucher Image Modal */}
+      {voucherImageModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setVoucherImageModal(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-md overflow-hidden rounded-lg border-2 border-emerald-500 bg-white p-2 shadow-2xl dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setVoucherImageModal(null)}
+              className="absolute right-2 top-2 z-10 rounded-full bg-black/50 p-1.5 text-white transition hover:bg-black/70"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+            <img
+              src={voucherImageModal}
+              alt="Voucher"
+              className="h-auto w-full rounded object-contain"
+            />
+            <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+              Screenshot this voucher and show it to the Tearista
+            </p>
           </div>
         </div>
       )}

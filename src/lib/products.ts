@@ -1,4 +1,4 @@
-export type ProductKey = "zus" | "chagee" | "tealive" | "kfc" | "cbtl" | "gigi" | "winrar" | "luckin";
+export type ProductKey = "zus" | "chagee" | "tealive" | "tealive_rm5" | "tealive_b1f1" | "kfc" | "cbtl" | "gigi" | "winrar" | "luckin";
 
 export type ProductConfig = {
   key: ProductKey;
@@ -8,7 +8,7 @@ export type ProductConfig = {
   priceLabel: string;
   logoUrl: string;
   redemptionInstructions: string;
-  productType: "otp" | "link" | "account";
+  productType: "otp" | "link" | "account" | "image";
   linkUrl?: string; // Static link for link-type products
   accountType?: "luckin"; // For account-type products, specifies which account pool to use
 };
@@ -169,6 +169,19 @@ const LUCKIN_INSTRUCTIONS = `📦 Available for PICKUP and DELIVERY
 
 We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
 
+const TEALIVE_VOUCHER_INSTRUCTIONS = `🎫 Tealive Voucher
+
+✅ Steps to Redeem:
+1. Click "Get Voucher" to receive your voucher image
+2. Show the voucher barcode to the Tearista at any Tealive outlet
+3. The Tearista will scan the barcode to apply your voucher
+
+⚠️ Each voucher can only be used ONCE.
+⚠️ Please use the voucher before the expiry date shown.
+✅ Screenshot the voucher image for safekeeping.
+
+We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
+
 export const PRODUCT_CATALOG: ProductConfig[] = [
   { key: "cbtl", productType: "otp", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
   { key: "kfc", productType: "otp", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
@@ -177,7 +190,9 @@ export const PRODUCT_CATALOG: ProductConfig[] = [
   { key: "chagee", productType: "otp", name: "Chagee", serviceCode: "bwx", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s", redemptionInstructions: CHAGEE_INSTRUCTIONS },
   { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS, productType: "otp" },
   { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://images.wincrunch.com/winrar-logo.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" },
-  { key: "luckin", name: "Luckin Coffee", serviceCode: "luckin", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://1000logos.net/wp-content/uploads/2025/09/Luckin-Coffee-Logo.png", redemptionInstructions: LUCKIN_INSTRUCTIONS, productType: "account", accountType: "luckin" }
+  { key: "luckin", name: "Luckin Coffee", serviceCode: "luckin", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://1000logos.net/wp-content/uploads/2025/09/Luckin-Coffee-Logo.png", redemptionInstructions: LUCKIN_INSTRUCTIONS, productType: "account", accountType: "luckin" },
+  { key: "tealive_rm5", name: "Tealive RM5 Voucher", serviceCode: "tealive_rm5", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_VOUCHER_INSTRUCTIONS, productType: "image" },
+  { key: "tealive_b1f1", name: "Tealive Buy 1 Free 1 Voucher", serviceCode: "tealive_b1f1", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_VOUCHER_INSTRUCTIONS, productType: "image" }
 ];
 
 export const PRODUCT_MAP: Record<ProductKey, ProductConfig> = PRODUCT_CATALOG.reduce(

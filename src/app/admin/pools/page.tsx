@@ -68,6 +68,21 @@ export default function PoolsPage() {
           </p>
           <p className="mt-4 text-xs text-slate-400">Click to manage →</p>
         </Link>
+
+        {/* Tealive Voucher Image Pool */}
+        <Link
+          href="/admin/pools/tealive-vouchers"
+          className="group border border-slate-200 bg-white p-6 transition hover:border-cyan-500 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-400"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Tealive Voucher Pool</h2>
+            <span className="text-cyan-600 transition group-hover:translate-x-1 dark:text-cyan-400">→</span>
+          </div>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Upload and manage Tealive RM5 and Buy 1 Free 1 voucher images
+          </p>
+          <p className="mt-4 text-xs text-slate-400">Click to manage →</p>
+        </Link>
       </div>
 
       

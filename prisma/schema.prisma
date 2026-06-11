@@ -125,6 +125,7 @@ model Claim {
   emailFetchedAt   DateTime?
   emailAccount     EmailAccount?
   luckinAccount    LuckinAccount?
+  voucherImage     VoucherImage?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -144,6 +145,26 @@ model EmailAccount {
   updatedAt        DateTime    @updatedAt
 
   @@index([status])
+}
+
+enum VoucherImageStatus {
+  available
+  used
+  disabled
+}
+
+model VoucherImage {
+  id          Int                @id @default(autoincrement())
+  productKey  String // "tealive_rm5" or "tealive_b1f1"
+  imageUrl    String // Uploaded image URL (base64 data URL or external URL)
+  status      VoucherImageStatus @default(available)
+  claimId     String?            @unique
+  claim       Claim?             @relation(fields: [claimId], references: [claimId], onDelete: SetNull)
+  assignedAt  DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([productKey, status])
 }
 
 enum LuckinAccountStatus {
