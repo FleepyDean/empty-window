@@ -7,20 +7,39 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const productKey = searchParams.get("productKey");
+  const page = parseInt(searchParams.get("page") ?? "1", 10);
+  const limit = parseInt(searchParams.get("limit") ?? "24", 10);
 
   const where = productKey ? { productKey } : {};
 
-  const images = await prisma.voucherImage.findMany({
-    where,
-    orderBy: [{ status: "asc" }, { id: "desc" }],
-    include: {
-      claim: {
-        select: { claimId: true, status: true, createdAt: true, orderId: true }
-      }
-    }
-  });
+  const skip = (page - 1) * limit;
 
-  return NextResponse.json({ images });
+  const [images, total, available, used, disabled] = await Promise.all([
+    prisma.voucherImage.findMany({
+      where,
+      orderBy: [{ status: "asc" }, { id: "desc" }],
+      skip,
+      take: limit,
+      include: {
+        claim: {
+          select: { claimId: true, status: true, createdAt: true, orderId: true }
+        }
+      }
+    }),
+    prisma.voucherImage.count({ where }),
+    prisma.voucherImage.count({ where: { ...where, status: "available" } }),
+    prisma.voucherImage.count({ where: { ...where, status: "used" } }),
+    prisma.voucherImage.count({ where: { ...where, status: "disabled" } })
+  ]);
+
+  return NextResponse.json({
+    images,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+    stats: { available, used, disabled }
+  });
 }
 
 export async function POST(request: Request) {

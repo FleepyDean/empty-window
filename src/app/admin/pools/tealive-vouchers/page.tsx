@@ -21,24 +21,34 @@ const PRODUCT_OPTIONS = [
   { key: "tealive_b1f1", label: "Tealive Buy 1 Free 1 Voucher" }
 ];
 
+const ITEMS_PER_PAGE = 24;
+
 export default function TealiveVouchersPoolPage() {
   const [images, setImages] = useState<VoucherImageRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterKey, setFilterKey] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [selectedProductKey, setSelectedProductKey] = useState("tealive_rm5");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState({ available: 0, used: 0, disabled: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function fetchImages() {
+  async function fetchImages(currentPage = page) {
     setLoading(true);
     try {
-      const url = filterKey
-        ? `/api/admin/voucher-images?productKey=${filterKey}`
-        : "/api/admin/voucher-images";
+      let url = `/api/admin/voucher-images?page=${currentPage}&limit=${ITEMS_PER_PAGE}`;
+      if (filterKey) url += `&productKey=${filterKey}`;
       const res = await fetch(url);
       const data = await res.json();
-      if (res.ok) setImages(data.images);
-      else toast.error(data.message ?? "Failed to fetch voucher images.");
+      if (res.ok) {
+        setImages(data.images);
+        setTotalPages(data.totalPages ?? 1);
+        setTotal(data.total ?? 0);
+        setPage(data.page ?? 1);
+        setStats(data.stats ?? { available: 0, used: 0, disabled: 0 });
+      } else toast.error(data.message ?? "Failed to fetch voucher images.");
     } catch {
       toast.error("Failed to fetch voucher images.");
     } finally {
@@ -143,15 +153,11 @@ export default function TealiveVouchersPoolPage() {
   }
 
   useEffect(() => {
-    fetchImages();
+    setPage(1);
+    fetchImages(1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey]);
 
-  const stats = {
-    available: images.filter((i) => i.status === "available").length,
-    used: images.filter((i) => i.status === "used").length,
-    disabled: images.filter((i) => i.status === "disabled").length
-  };
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
@@ -247,7 +253,7 @@ export default function TealiveVouchersPoolPage() {
           ))}
         </select>
         <button
-          onClick={fetchImages}
+          onClick={() => fetchImages(1)}
           className="border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
         >
           Refresh
@@ -320,6 +326,34 @@ export default function TealiveVouchersPoolPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div className="text-xs text-slate-500">
+              Showing {((page - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(page * ITEMS_PER_PAGE, total)} of {total} images
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchImages(page - 1)}
+                disabled={page <= 1 || loading}
+                className="border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-slate-500">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => fetchImages(page + 1)}
+                disabled={page >= totalPages || loading}
+                className="border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
