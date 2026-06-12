@@ -14,13 +14,33 @@ export async function GET(request: Request) {
 
   const skip = (page - 1) * limit;
 
+  // If requesting a single image by id, return full data including imageUrl
+  const imageId = searchParams.get("id");
+  if (imageId) {
+    const image = await prisma.voucherImage.findUnique({
+      where: { id: parseInt(imageId, 10) },
+      include: {
+        claim: {
+          select: { claimId: true, status: true, createdAt: true, orderId: true }
+        }
+      }
+    });
+    return NextResponse.json({ image });
+  }
+
   const [images, total, available, used, disabled] = await Promise.all([
     prisma.voucherImage.findMany({
       where,
       orderBy: [{ status: "asc" }, { id: "desc" }],
       skip,
       take: limit,
-      include: {
+      select: {
+        id: true,
+        productKey: true,
+        status: true,
+        claimId: true,
+        assignedAt: true,
+        createdAt: true,
         claim: {
           select: { claimId: true, status: true, createdAt: true, orderId: true }
         }

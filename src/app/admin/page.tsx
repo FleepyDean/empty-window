@@ -217,6 +217,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [savingOrder, setSavingOrder] = useState(false);
   const [ordersPage, setOrdersPage] = useState(1);
   const [orderSearch, setOrderSearch] = useState("");
+  const [productFilter, setProductFilter] = useState("");
   const ORDERS_PER_PAGE = 10;
 
   // Collapsible sections state (minimized by default)
@@ -637,12 +638,29 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
             <p className="mt-0.5 text-xs text-slate-400">
-              {orderSearch.trim()
-                ? `${orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())).length} of ${orders.length} total`
+              {(orderSearch.trim() || productFilter)
+                ? `${orders.filter((o) => {
+                    if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
+                    if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
+                    return true;
+                  }).length} of ${orders.length} total`
                 : `${orders.length} total`}
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <select
+              value={productFilter}
+              onChange={(e) => {
+                setProductFilter(e.target.value);
+                setOrdersPage(1);
+              }}
+              className="border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+            >
+              <option value="">All Products</option>
+              {PRODUCT_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key}>{opt.name}</option>
+              ))}
+            </select>
             <div className="relative">
               <input
                 type="text"
@@ -699,9 +717,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <td colSpan={7} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
                 </tr>
               ) : (
-                (orderSearch.trim()
-                  ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
-                  : orders
+                (orders.filter((o) => {
+                  if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
+                  if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
+                  return true;
+                })
                 ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
                   <tr key={order.orderId} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-4 py-2">
@@ -807,9 +827,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
         {/* Pagination */}
         {(() => {
-          const filteredOrders = orderSearch.trim()
-            ? orders.filter((o) => o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim()))
-            : orders;
+          const filteredOrders = orders.filter((o) => {
+            if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
+            if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
+            return true;
+          });
           const totalPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
           if (filteredOrders.length <= ORDERS_PER_PAGE) return null;
           return (

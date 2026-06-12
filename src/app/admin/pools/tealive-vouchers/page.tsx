@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/theme";
 type VoucherImageRow = {
   id: number;
   productKey: string;
-  imageUrl: string;
+  imageUrl?: string;
   status: string;
   claimId: string | null;
   assignedAt: string | null;
@@ -21,7 +21,7 @@ const PRODUCT_OPTIONS = [
   { key: "tealive_b1f1", label: "Tealive Buy 1 Free 1 Voucher" }
 ];
 
-const ITEMS_PER_PAGE = 24;
+const ITEMS_PER_PAGE = 50;
 
 export default function TealiveVouchersPoolPage() {
   const [images, setImages] = useState<VoucherImageRow[]>([]);
@@ -33,6 +33,12 @@ export default function TealiveVouchersPoolPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState({ available: 0, used: 0, disabled: 0 });
+  const [previewImage, setPreviewImage] = useState<VoucherImageRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editStatus, setEditStatus] = useState("");
+  const lastClickedIdx = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchImages(currentPage = page) {
@@ -118,11 +124,63 @@ export default function TealiveVouchersPoolPage() {
     }
   }
 
-  async function toggleStatus(id: number, currentStatus: string) {
-    const newStatus = currentStatus === "available" ? "disabled" : "available";
+  function toggleSelect(id: number, e: React.MouseEvent) {
+    const currentIdx = images.findIndex((a) => a.id === id);
 
+    if (e.shiftKey && lastClickedIdx.current !== null && lastClickedIdx.current !== currentIdx) {
+      const start = Math.min(lastClickedIdx.current, currentIdx);
+      const end = Math.max(lastClickedIdx.current, currentIdx);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          next.add(images[i].id);
+        }
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
+    lastClickedIdx.current = currentIdx;
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === images.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(images.map((a) => a.id)));
+    }
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected voucher image(s)?`)) return;
+    setBulkDeleting(true);
+    let deleted = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch("/api/admin/voucher-images", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id })
+        });
+        if (res.ok) deleted++;
+      } catch { /* ignore */ }
+    }
+    toast.success(`Deleted ${deleted} of ${selectedIds.size} voucher(s).`);
+    setSelectedIds(new Set());
+    setBulkDeleting(false);
+    await fetchImages();
+  }
+
+  async function saveStatusEdit(id: number, newStatus: string) {
     // Extra warning when re-enabling a used voucher
-    if (currentStatus === "used") {
+    const currentImg = images.find((i) => i.id === id);
+    if (currentImg?.status === "used" && newStatus === "available") {
       const confirmed = confirm(
         "WARNING: This voucher was already claimed by a customer.\n\n" +
         "Re-enabling it will:\n" +
@@ -131,7 +189,10 @@ export default function TealiveVouchersPoolPage() {
         "Only do this if the previous claim was a mistake or refunded.\n\n" +
         "Continue?"
       );
-      if (!confirmed) return;
+      if (!confirmed) {
+        setEditingId(null);
+        return;
+      }
     }
 
     try {
@@ -141,7 +202,7 @@ export default function TealiveVouchersPoolPage() {
         body: JSON.stringify({ id, status: newStatus })
       });
       if (res.ok) {
-        toast.success(currentStatus === "used" ? "Voucher re-enabled and returned to pool." : `Status changed to ${newStatus}.`);
+        toast.success(`Status changed to ${newStatus}.`);
         await fetchImages();
       } else {
         const d = await res.json();
@@ -149,6 +210,27 @@ export default function TealiveVouchersPoolPage() {
       }
     } catch {
       toast.error("Failed to update.");
+    }
+    setEditingId(null);
+  }
+
+  async function fetchPreview(img: VoucherImageRow) {
+    // If we already have the imageUrl cached, just show it
+    if (img.imageUrl) {
+      setPreviewImage(img);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/voucher-images?id=${img.id}`);
+      const data = await res.json();
+      if (res.ok && data.image) {
+        const full = { ...img, imageUrl: data.image.imageUrl };
+        setPreviewImage(full);
+      } else {
+        toast.error("Failed to load preview.");
+      }
+    } catch {
+      toast.error("Failed to load preview.");
     }
   }
 
@@ -200,7 +282,7 @@ export default function TealiveVouchersPoolPage() {
         </div>
         <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase tracking-wide text-slate-500">Total</p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{images.length}</p>
+          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{stats.available + stats.used + stats.disabled}</p>
         </div>
       </div>
 
@@ -239,124 +321,223 @@ export default function TealiveVouchersPoolPage() {
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="mt-6 flex items-center gap-3">
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Filter:</label>
-        <select
-          value={filterKey}
-          onChange={(e) => setFilterKey(e.target.value)}
-          className="border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-        >
-          <option value="">All</option>
-          {PRODUCT_OPTIONS.map((opt) => (
-            <option key={opt.key} value={opt.key}>{opt.label}</option>
-          ))}
-        </select>
-        <button
-          onClick={() => fetchImages(1)}
-          className="border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-        >
-          Refresh
-        </button>
+      {/* Filter & Actions */}
+      <div className="mt-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Filter:</label>
+          <select
+            value={filterKey}
+            onChange={(e) => setFilterKey(e.target.value)}
+            className="border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+          >
+            <option value="">All</option>
+            {PRODUCT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => fetchImages(1)}
+            disabled={loading}
+            className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+          >
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+        {selectedIds.size > 0 && (
+          <button
+            onClick={bulkDelete}
+            disabled={bulkDeleting}
+            className="border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 disabled:opacity-40 dark:border-red-700 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+          >
+            {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
+          </button>
+        )}
       </div>
 
-      {/* Images Grid */}
+      {/* Voucher List */}
       <div className="mt-4">
         {loading ? (
           <p className="py-8 text-center text-sm text-slate-500">Loading...</p>
         ) : images.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500">No voucher images in the pool yet.</p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {images.map((img) => (
-              <div
-                key={img.id}
-                className={`border p-3 ${
-                  img.status === "available"
-                    ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20"
-                    : img.status === "used"
-                      ? "border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20"
-                      : "border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20"
-                }`}
-              >
-                <div className="aspect-[3/4] w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-                  <img
-                    src={img.imageUrl}
-                    alt={`Voucher #${img.id}`}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <div className="mt-2">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-medium uppercase ${
-                      img.status === "available" ? "text-emerald-600" : img.status === "used" ? "text-amber-600" : "text-red-600"
-                    }`}>
-                      {img.status}
-                    </span>
-                    <span className="text-xs text-slate-400">#{img.id}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {PRODUCT_OPTIONS.find((o) => o.key === img.productKey)?.label ?? img.productKey}
-                  </p>
-                  {img.claim && (
-                    <p className="mt-1 text-xs text-slate-400">
-                      Assigned to: {img.claim.orderId}
-                    </p>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => toggleStatus(img.id, img.status)}
-                      className={`text-xs underline ${
-                        img.status === "used"
-                          ? "text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
-                          : "text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      {img.status === "available" ? "Disable" : img.status === "used" ? "Re-enable" : "Enable"}
-                    </button>
-                    {img.status !== "used" && (
-                      <button
-                        onClick={() => deleteImage(img.id)}
-                        className="text-xs text-red-600 underline hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
+                  <tr>
+                    <th className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={images.length > 0 && selectedIds.size === images.length}
+                        onChange={toggleSelectAll}
+                        className="h-3.5 w-3.5 cursor-pointer accent-red-500"
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">#</th>
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Product</th>
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Assigned To</th>
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Created</th>
+                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {images.map((img) => (
+                    <tr key={img.id} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(img.id)}
+                          onClick={(e) => toggleSelect(img.id, e)}
+                          onChange={() => {}}
+                          className="h-3.5 w-3.5 cursor-pointer accent-red-500"
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-500">{img.id}</td>
+                      <td className="px-4 py-2 text-xs text-slate-600 dark:text-slate-400">
+                        {PRODUCT_OPTIONS.find((o) => o.key === img.productKey)?.label ?? img.productKey}
+                      </td>
+                      <td className="px-4 py-2">
+                        {editingId === img.id ? (
+                          <select
+                            value={editStatus}
+                            onChange={(e) => {
+                              setEditStatus(e.target.value);
+                              saveStatusEdit(img.id, e.target.value);
+                            }}
+                            onBlur={() => setEditingId(null)}
+                            className="border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
+                            autoFocus
+                          >
+                            <option value="available">available</option>
+                            <option value="used">used</option>
+                            <option value="disabled">disabled</option>
+                          </select>
+                        ) : (
+                          <span
+                            onClick={() => { setEditingId(img.id); setEditStatus(img.status); }}
+                            className={`inline-block cursor-pointer px-1.5 py-0.5 text-xs hover:opacity-80 ${
+                              img.status === "available"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : img.status === "used"
+                                ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                : "bg-red-500/10 text-red-600 dark:text-red-400"
+                            }`}>{img.status}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-500">
+                        {img.claim ? img.claim.orderId : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-500">
+                        {new Date(img.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => fetchPreview(img)}
+                            className="text-xs text-cyan-500 hover:text-cyan-400"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => deleteImage(img.id)}
+                            className="text-xs text-red-500 hover:text-red-400"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-800">
-            <div className="text-xs text-slate-500">
-              Showing {((page - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(page * ITEMS_PER_PAGE, total)} of {total} images
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+            <p className="text-xs text-slate-500">
+              Page {page} of {totalPages} · showing {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => fetchImages(1)}
+                disabled={page === 1 || loading}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >«</button>
               <button
                 onClick={() => fetchImages(page - 1)}
-                disabled={page <= 1 || loading}
-                className="border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              >
-                Previous
-              </button>
-              <span className="text-xs text-slate-500">
-                Page {page} of {totalPages}
-              </span>
+                disabled={page === 1 || loading}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >‹ Prev</button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let start = Math.max(1, page - 2);
+                if (start + 4 > totalPages) start = Math.max(1, totalPages - 4);
+                const p = start + i;
+                if (p > totalPages) return null;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => fetchImages(p)}
+                    disabled={loading}
+                    className={`px-2.5 py-1 text-xs ${
+                      p === page
+                        ? "bg-cyan-500 font-semibold text-white"
+                        : "text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
               <button
                 onClick={() => fetchImages(page + 1)}
-                disabled={page >= totalPages || loading}
-                className="border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              >
-                Next
-              </button>
+                disabled={page === totalPages || loading}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >Next ›</button>
+              <button
+                onClick={() => fetchImages(totalPages)}
+                disabled={page === totalPages || loading}
+                className="px-2 py-1 text-xs text-slate-500 disabled:opacity-30 hover:text-cyan-600 dark:hover:text-cyan-400"
+              >»</button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-md overflow-hidden rounded-lg border-2 border-slate-500 bg-white p-2 shadow-2xl dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute right-2 top-2 z-10 rounded-full bg-black/50 p-1.5 text-white transition hover:bg-black/70"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+            <img
+              src={previewImage.imageUrl}
+              alt={`Voucher #${previewImage.id}`}
+              className="h-auto w-full rounded object-contain"
+            />
+            <div className="mt-2 flex items-center justify-between px-1">
+              <span className="text-xs text-slate-500">#{previewImage.id} · {PRODUCT_OPTIONS.find((o) => o.key === previewImage.productKey)?.label ?? previewImage.productKey}</span>
+              <span className={`text-xs font-medium uppercase ${
+                previewImage.status === "available" ? "text-emerald-600" : previewImage.status === "used" ? "text-amber-600" : "text-red-600"
+              }`}>{previewImage.status}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
