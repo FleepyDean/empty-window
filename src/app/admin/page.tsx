@@ -542,7 +542,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Account Pools</h2>
-            <p className="mt-0.5 text-xs text-slate-400">Manage CBTL Email Pool and Luckin Coffee Account Pool</p>
+            <p className="mt-0.5 text-xs text-slate-400">Manage CBTL, Tealive and Luckin Coffee Account Pool</p>
           </div>
           <a
             href="/admin/pools"
@@ -634,7 +634,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Orders Table */}
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
             <p className="mt-0.5 text-xs text-slate-400">
@@ -647,7 +647,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : `${orders.length} total`}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <select
               value={productFilter}
               onChange={(e) => {
@@ -670,7 +670,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   setOrdersPage(1);
                 }}
                 placeholder="Search order ID..."
-                className="w-48 border border-slate-300 bg-white pr-7 pl-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                className="w-36 border border-slate-300 bg-white pr-7 pl-3 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 sm:w-48 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
               />
               {orderSearch && (
                 <button
@@ -702,8 +702,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Products</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Total Qty</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Claims</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Created</th>
+                <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 sm:table-cell">Claims</th>
+                <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 md:table-cell">Created</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
               </tr>
             </thead>
@@ -781,8 +781,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-slate-500">{order._count.claims}</td>
-                    <td className="px-4 py-2 text-xs text-slate-500">
+                    <td className="hidden px-4 py-2 text-slate-500 sm:table-cell">{order._count.claims}</td>
+                    <td className="hidden px-4 py-2 text-xs text-slate-500 md:table-cell">
                       {new Date(order.createdAt).toLocaleString()}
                     </td>
                     <td className="px-4 py-2">

@@ -952,7 +952,7 @@ function RedeemPageContent() {
                     />
                     <div className="flex-1">
                       <h3 className="font-semibold text-slate-900 dark:text-white">{product.productName}</h3>
-                      {product.productType === "otp" && (
+                      {(product.productType === "otp" || product.productType === "image") && (
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           {product.remainingQty} of {product.totalQuantity} remaining
                         </p>
@@ -1460,6 +1460,8 @@ function getLogoUrl(productKey: string): string {
     zus: "https://resources.wobbjobs.com/jobs-malaysia/companies/2cced996-255d-4525-812b-e9319b8ce8f2/company_logo/original/13f90cff-059d-435e-b166-794a51360600-logo.jpg",
     chagee: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s",
     tealive: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s",
+    tealive_rm5: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s",
+    tealive_b1f1: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s",
     kfc: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png",
     cbtl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg",
     gigi: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png"
