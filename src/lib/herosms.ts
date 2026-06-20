@@ -122,7 +122,7 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, op
 // Loyalty tier prices per service — cheaper than the standard API-reported price.
 // These are account-level discounts that getPrices won't show but getNumber will honor.
 const LOYALTY_PRICES: Record<string, number> = {
-  ot: 0.0704,
+  ot: 0.0755,
   aik: 0.0386
 };
 
