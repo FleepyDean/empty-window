@@ -218,6 +218,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [ordersPage, setOrdersPage] = useState(1);
   const [orderSearch, setOrderSearch] = useState("");
   const [productFilter, setProductFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const ORDERS_PER_PAGE = 10;
 
   // Collapsible sections state (minimized by default)
@@ -638,10 +639,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
             <p className="mt-0.5 text-xs text-slate-400">
-              {(orderSearch.trim() || productFilter)
+              {(orderSearch.trim() || productFilter || statusFilter)
                 ? `${orders.filter((o) => {
                     if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
                     if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
+                    if (statusFilter && o.status !== statusFilter) return false;
                     return true;
                   }).length} of ${orders.length} total`
                 : `${orders.length} total`}
@@ -660,6 +662,18 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               {PRODUCT_OPTIONS.map((opt) => (
                 <option key={opt.key} value={opt.key}>{opt.name}</option>
               ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setOrdersPage(1);
+              }}
+              className="border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+            >
+              <option value="">All Status</option>
+              <option value="active">Available</option>
+              <option value="depleted">Depleted</option>
             </select>
             <div className="relative">
               <input
@@ -720,6 +734,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 (orders.filter((o) => {
                   if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
                   if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
+                  if (statusFilter && o.status !== statusFilter) return false;
                   return true;
                 })
                 ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
@@ -885,7 +900,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         })()}
       </div>
 
-      {/* Product Prices - Collapsible */}
+      {/* Product Prices - Collapsible
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <button
           onClick={() => setShowProductPrices(!showProductPrices)}
@@ -994,7 +1009,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </tbody>
           </table>
         </div>}
-      </div>
+      </div> */}
 
       {/* Product Content - Collapsible */}
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

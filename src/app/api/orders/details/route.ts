@@ -60,21 +60,28 @@ export async function POST(request: Request) {
         productType: PRODUCT_MAP[item.productKey as keyof typeof PRODUCT_MAP]?.productType ?? "otp",
         linkUrl: PRODUCT_MAP[item.productKey as keyof typeof PRODUCT_MAP]?.linkUrl ?? null
       }))
-    : [
-        {
-          itemId: null,
-          productKey: order.productKey,
-          productName: order.productName,
-          serviceCode: order.serviceCode,
-          heroServiceCode: order.heroServiceCode,
-          totalQuantity: order.quantity,
-          remainingQty: order.quantity,
-          canClaim: order.quantity > 0,
-          logoUrl: getLogoUrl(order.productKey),
-          productType: PRODUCT_MAP[order.productKey as keyof typeof PRODUCT_MAP]?.productType ?? "otp",
-          linkUrl: PRODUCT_MAP[order.productKey as keyof typeof PRODUCT_MAP]?.linkUrl ?? null
-        }
-      ];
+    : (() => {
+        // Legacy orders: order.quantity is decremented as claims are consumed,
+        // so reconstruct the original total from current remaining + deducted claims.
+        const deductedClaims = order.claims.filter((c) => c.quantityDeducted).length;
+        const remainingQty = order.quantity;
+        const totalQuantity = remainingQty + deductedClaims;
+        return [
+          {
+            itemId: null,
+            productKey: order.productKey,
+            productName: order.productName,
+            serviceCode: order.serviceCode,
+            heroServiceCode: order.heroServiceCode,
+            totalQuantity,
+            remainingQty,
+            canClaim: remainingQty > 0,
+            logoUrl: getLogoUrl(order.productKey),
+            productType: PRODUCT_MAP[order.productKey as keyof typeof PRODUCT_MAP]?.productType ?? "otp",
+            linkUrl: PRODUCT_MAP[order.productKey as keyof typeof PRODUCT_MAP]?.linkUrl ?? null
+          }
+        ];
+      })();
 
   // Format claims history
   const allClaims = isCartOrder

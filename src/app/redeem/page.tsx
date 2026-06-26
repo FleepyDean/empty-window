@@ -953,7 +953,15 @@ function RedeemPageContent() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-slate-900 dark:text-white">{product.productName}</h3>
                       {(product.productType === "otp" || product.productType === "image") && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p
+                          className={`text-xs font-medium ${
+                            product.remainingQty === 0
+                              ? "text-red-500 dark:text-red-400"
+                              : product.remainingQty < product.totalQuantity
+                                ? "text-amber-500 dark:text-amber-400"
+                                : "text-slate-500 dark:text-slate-400"
+                          }`}
+                        >
                           {product.remainingQty} of {product.totalQuantity} remaining
                         </p>
                       )}

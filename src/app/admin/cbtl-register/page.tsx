@@ -354,6 +354,7 @@ export default function CbtlRegisterPage() {
         setEmailOtpStatus("idle");
         setActiveEmailId(null);
         clearSession();
+        fetchBalance();
         toast.success("Account activated! Status set to available, expiry +14 days.");
       } else {
         const d = await res.json();
