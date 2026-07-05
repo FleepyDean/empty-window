@@ -13,7 +13,7 @@ type EmailAccountRow = {
   assignedAt: string | null;
   voucherExpiresAt: string | null;
   createdAt: string;
-  claim: { claimId: string; status: string; emailOtp: string | null; createdAt: string } | null;
+  claim: { claimId: string; status: string; emailOtp: string | null; createdAt: string; order: { orderId: string } | null } | null;
 };
 
 export default function CbtlPoolPage() {
@@ -299,6 +299,7 @@ export default function CbtlPoolPage() {
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Voucher Expiry</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Claim</th>
+                <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Order ID</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Email OTP</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Assigned</th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
@@ -306,9 +307,9 @@ export default function CbtlPoolPage() {
             </thead>
             <tbody>
               {emailAccountsLoading ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
+                <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-500">Loading...</td></tr>
               ) : emailAccounts.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-slate-500">No email accounts. Click Refresh to load.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-500">No email accounts. Click Refresh to load.</td></tr>
               ) : (
                 [...emailAccounts].sort((a, b) => {
                   const order = { available: 0, disabled: 1, used: 2 };
@@ -401,6 +402,17 @@ export default function CbtlPoolPage() {
                               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                               : "bg-slate-100 text-slate-500 dark:bg-slate-800"
                           }`}>{row.claim.status}</span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs text-slate-500">
+                        {row.claim?.order?.orderId ? (
+                          <a
+                            href={`/redeem?orderId=${row.claim.order.orderId}`}
+                            target="_blank"
+                            className="text-cyan-600 hover:underline dark:text-cyan-400"
+                          >
+                            {row.claim.order.orderId}
+                          </a>
                         ) : "—"}
                       </td>
                       <td className="px-4 py-2 font-mono text-xs">

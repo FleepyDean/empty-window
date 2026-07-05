@@ -37,7 +37,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
   }
 
-  const { productKey, quantity, cart } = await request.json();
+  const { productKey, quantity, cart, customOrderId } = await request.json();
+
+  // Validate custom order ID if provided
+  let finalOrderId = buildOrderId();
+  if (typeof customOrderId === "string" && customOrderId.trim()) {
+    const trimmed = customOrderId.trim();
+    const existing = await prisma.order.findUnique({ where: { orderId: trimmed } });
+    if (existing) {
+      return NextResponse.json({ message: `Order ID "${trimmed}" already exists.` }, { status: 409 });
+    }
+    finalOrderId = trimmed;
+  }
 
   const orderItems: Array<{
     productKey: string;
@@ -85,7 +96,7 @@ export async function POST(request: Request) {
 
   const order = await prisma.order.create({
     data: {
-      orderId: buildOrderId(),
+      orderId: finalOrderId,
       productKey: primaryItem.productKey,
       productName: primaryItem.productName,
       serviceCode: primaryItem.serviceCode,

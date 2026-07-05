@@ -9,7 +9,7 @@ export async function GET() {
     orderBy: [{ status: "asc" }, { id: "asc" }],
     include: {
       claim: {
-        select: { claimId: true, status: true, emailOtp: true, createdAt: true }
+        select: { claimId: true, status: true, emailOtp: true, createdAt: true, order: { select: { orderId: true } } }
       }
     }
   });

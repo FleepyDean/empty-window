@@ -94,6 +94,7 @@ type OrderItem = {
   productKey: string;
   productName: string;
   quantity: number;
+  remainingQty: number;
 };
 
 type OrderRow = {
@@ -219,6 +220,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [orderSearch, setOrderSearch] = useState("");
   const [productFilter, setProductFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [customOrderId, setCustomOrderId] = useState("");
   const ORDERS_PER_PAGE = 10;
 
   // Collapsible sections state (minimized by default)
@@ -400,6 +402,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          customOrderId: customOrderId.trim() || undefined,
           cart: cart.map((item) => ({
             productKey: item.productKey,
             quantity: item.quantity
@@ -410,6 +413,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       if (res.ok) {
         toast.success(`Order ${data.order.orderId} created with ${cart.length} product(s).`);
         setCart([]);
+        setCustomOrderId("");
         fetchOrders();
       } else {
         toast.error(data.message ?? "Failed to create order.");
@@ -561,6 +565,16 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Add Order</h2>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div>
+            <label className="text-xs text-slate-500">Order ID (optional)</label>
+            <input
+              type="text"
+              value={customOrderId}
+              onChange={(e) => setCustomOrderId(e.target.value)}
+              placeholder="Auto-generated if blank"
+              className="mt-1 block w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+          <div>
             <label className="text-xs text-slate-500">Product</label>
             <select
               value={newProductKey}
@@ -639,14 +653,24 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Orders</h2>
             <p className="mt-0.5 text-xs text-slate-400">
-              {(orderSearch.trim() || productFilter || statusFilter)
-                ? `${orders.filter((o) => {
-                    if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
-                    if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
-                    if (statusFilter && o.status !== statusFilter) return false;
-                    return true;
-                  }).length} of ${orders.length} total`
-                : `${orders.length} total`}
+              {(() => {
+                const filtered = orders.filter((o) => {
+                  if (orderSearch.trim() && !o.orderId.toLowerCase().includes(orderSearch.toLowerCase().trim())) return false;
+                  if (productFilter && o.productKey !== productFilter && !(o.items?.some((item) => item.productKey === productFilter))) return false;
+                  if (statusFilter && o.status !== statusFilter) return false;
+                  return true;
+                });
+                const totalRemaining = filtered.reduce((sum, o) => {
+                  if (o.isCartOrder && o.items?.length > 0) {
+                    return sum + o.items.reduce((s, item) => s + (item.remainingQty ?? 0), 0);
+                  }
+                  return sum + o.quantity;
+                }, 0);
+                if (orderSearch.trim() || productFilter || statusFilter) {
+                  return `${filtered.length} of ${orders.length} orders · ${totalRemaining} qty available`;
+                }
+                return `${orders.length} orders · ${totalRemaining} qty available`;
+              })()}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">

@@ -1281,7 +1281,7 @@ function RedeemPageContent() {
                   orderDetails.claims.map((claim) => (
                     <div
                       key={claim.claimId}
-                      className="flex items-center gap-4 border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50"
+                      className="flex flex-col gap-3 border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:gap-4 dark:border-slate-700 dark:bg-slate-800/50"
                     >
                       <img
                         src={getLogoUrl(claim.productKey)}
@@ -1297,9 +1297,9 @@ function RedeemPageContent() {
                           <p className="text-sm font-mono text-slate-600 dark:text-slate-400">{claim.phoneNumber.replace(/^6/, "")}</p>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="w-full sm:w-auto sm:text-right">
                         {claim.status === "success" && claim.otp ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between gap-2 sm:justify-end">
                             <span className="text-lg font-bold text-cyan-600 dark:text-cyan-400">{claim.otp}</span>
                             <button
                               onClick={() => copyToClipboard(claim.otp!, "OTP")}
