@@ -71,6 +71,11 @@ export default function CbtlRegisterPage() {
   const [completed, setCompleted] = useState<AccountEntry[]>([]);
   const [activating, setActivating] = useState(false);
 
+  // Number watcher state
+  const [watching, setWatching] = useState(false);
+  const [watcherStatus, setWatcherStatus] = useState<{ available: boolean; reservedNumber: { activationId: string; phoneNumber: string } | null; telegramConfigured: boolean } | null>(null);
+  const watcherRef = useRef<NodeJS.Timeout | null>(null);
+
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
   const emailPollRef = useRef<NodeJS.Timeout | null>(null);
@@ -367,6 +372,86 @@ export default function CbtlRegisterPage() {
     }
   }
 
+  // ── Number watcher ──────────────────────────────────────────────────────────
+
+  async function pollWatcher() {
+    try {
+      const res = await fetch("/api/admin/number-watcher");
+      if (!res.ok) return;
+      const d = await res.json();
+      setWatcherStatus({
+        available: d.available,
+        reservedNumber: d.reservedNumber ?? null,
+        telegramConfigured: d.telegramConfigured
+      });
+      if (d.available && d.reservedNumber && !watcherStatus?.reservedNumber) {
+        toast.success(`HeroSMS number reserved: ${d.reservedNumber.phoneNumber}`, { duration: 10000 });
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function takeReservedNumber() {
+    if (!activeEmailId) { toast.error("Select an email first."); return; }
+    try {
+      const res = await fetch("/api/admin/number-watcher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "take" })
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.message ?? "Failed to take reserved number."); return; }
+      const newSms: SmsSession = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" };
+      const requestedAt = Date.now();
+      setSms(newSms);
+      setSmsRequestedAt(requestedAt);
+      setElapsed(0);
+      saveSession({ sms: newSms, smsRequestedAt: requestedAt });
+      startPolling(d.activationId);
+      toast.success(`Using reserved number: ${d.phoneNumber}`);
+    } catch {
+      toast.error("Failed to take reserved number.");
+    }
+  }
+
+  async function cancelReservedNumber() {
+    try {
+      const res = await fetch("/api/admin/number-watcher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel" })
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setWatcherStatus((prev) => prev ? { ...prev, available: false, reservedNumber: null } : null);
+        toast.success("Reserved number cleared.");
+      } else {
+        toast.error(d.message ?? "Failed to clear reservation.");
+      }
+    } catch {
+      toast.error("Failed to clear reservation.");
+    }
+  }
+
+  function startWatching() {
+    setWatching(true);
+    pollWatcher();
+    watcherRef.current = setInterval(pollWatcher, 30000);
+  }
+
+  function stopWatching() {
+    setWatching(false);
+    if (watcherRef.current) {
+      clearInterval(watcherRef.current);
+      watcherRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (watcherRef.current) clearInterval(watcherRef.current);
+    };
+  }, []);
+
   // ── Copy helper ────────────────────────────────────────────────────────────
 
   function copy(text: string, label: string) {
@@ -406,11 +491,11 @@ export default function CbtlRegisterPage() {
         </div>
 
         {/* Stats bar */}
-        <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <p className="text-xs uppercase tracking-wide text-slate-500">HeroSMS Balance</p>
             <p className="mt-1 text-xl font-bold text-cyan-600 dark:text-cyan-400">
-              {balance !== null ? `$${balance}` : "—"}
+              {balance !== null ? "$" + balance : "—"}
             </p>
             <button
               onClick={fetchBalance}
@@ -435,6 +520,61 @@ export default function CbtlRegisterPage() {
             <p className="text-xs uppercase tracking-wide text-slate-500">Done This Session</p>
             <p className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400">{completed.length}</p>
           </div>
+          <div className={"border p-4 " + (
+            watcherStatus?.available
+              ? "border-emerald-400 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/30"
+              : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+          )}>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Number Watcher</p>
+            {watching ? (
+              <>
+                <p className={"mt-1 text-sm font-bold " + (
+                  watcherStatus?.available
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-slate-500"
+                )}>
+                  {watcherStatus?.available
+                    ? "Number available!"
+                    : watcherStatus ? "No numbers" : "Checking..."}
+                </p>
+                {watcherStatus?.available && watcherStatus.reservedNumber && (
+                  <div className="mt-1 flex gap-2">
+                    <button
+                      onClick={takeReservedNumber}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
+                    >
+                      Use number
+                    </button>
+                    <button
+                      onClick={cancelReservedNumber}
+                      className="text-xs text-slate-400 hover:text-slate-300"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={stopWatching}
+                  className="mt-1 text-xs text-red-500 hover:text-red-400"
+                >
+                  Stop watching
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-sm font-bold text-slate-400">Idle</p>
+                <button
+                  onClick={startWatching}
+                  className="mt-1 text-xs text-cyan-600 hover:text-cyan-500 dark:text-cyan-400"
+                >
+                  Start watching
+                </button>
+              </>
+            )}
+            {watching && watcherStatus && !watcherStatus.telegramConfigured && (
+              <p className="mt-1 text-xs text-amber-500">Telegram not configured</p>
+            )}
+          </div>
         </div>
 
         {/* Main work area */}
@@ -457,9 +597,7 @@ export default function CbtlRegisterPage() {
                   <div
                     key={row.id}
                     onClick={() => selectEmail(row.id)}
-                    className={`flex cursor-pointer items-center justify-between border-b border-slate-100 px-4 py-2.5 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 ${
-                      activeEmailId === row.id ? "bg-cyan-50 dark:bg-cyan-900/20" : ""
-                    }`}
+                    className={"flex cursor-pointer items-center justify-between border-b border-slate-100 px-4 py-2.5 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 " + (activeEmailId === row.id ? "bg-cyan-50 dark:bg-cyan-900/20" : "")}
                   >
                     <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
                       {row.emailAddress}
@@ -521,7 +659,7 @@ export default function CbtlRegisterPage() {
               ) : (
                 <p className="mb-3 text-xs text-slate-400">
                   {emailOtpStatus === "polling"
-                    ? `Checking inbox for email to ${activeEmail?.emailAddress ?? "..."}`
+                    ? "Checking inbox for email to " + (activeEmail?.emailAddress ?? "...")
                     : "Not started"}
                 </p>
               )}
@@ -550,13 +688,13 @@ export default function CbtlRegisterPage() {
                     </button>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-block rounded px-1.5 py-0.5 text-xs ${
+                    <span className={"inline-block rounded px-1.5 py-0.5 text-xs " + (
                       sms.status === "success"
                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : sms.status === "cancelled"
                         ? "bg-red-500/10 text-red-600 dark:text-red-400"
                         : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                    }`}>
+                    )}>
                       {sms.status === "waiting" ? "Waiting for OTP..." : sms.status}
                     </span>
                     {sms.status !== "success" && (
@@ -565,7 +703,7 @@ export default function CbtlRegisterPage() {
                         className="text-xs text-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {smsRequestedAt && elapsed < CANCEL_LOCK_SECONDS
-                          ? `Cancel (locked ${CANCEL_LOCK_SECONDS - elapsed}s)`
+                          ? "Cancel (locked " + (CANCEL_LOCK_SECONDS - elapsed) + "s)"
                           : "Cancel number"}
                       </button>
                     )}
