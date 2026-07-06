@@ -12,11 +12,14 @@ let lastNotifiedAvailable = false;
 let lastNotifiedAt = 0;
 const MIN_NOTIFY_INTERVAL_MS = 5 * 60 * 1000;
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const maxPriceParam = searchParams.get("maxPrice");
+  const maxPrice = maxPriceParam ? parseFloat(maxPriceParam) : undefined;
   const service = "ot";
 
   let available = false;
@@ -28,7 +31,7 @@ export async function GET() {
   } else {
     // The only reliable availability test: try to actually get a number.
     try {
-      const result = await getNumberCheapest(service);
+      const result = await getNumberCheapest(service, maxPrice);
       reservedNumber = { activationId: result.activationId, phoneNumber: result.phoneNumber, price: result.price ?? null };
       available = true;
       console.log(`[NumberWatcher] Reserved number: ${result.phoneNumber} (${result.activationId})`);

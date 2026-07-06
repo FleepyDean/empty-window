@@ -77,6 +77,11 @@ export default function CbtlRegisterPage() {
   const [watcherStatus, setWatcherStatus] = useState<{ available: boolean; reservedNumber: { activationId: string; phoneNumber: string } | null; telegramConfigured: boolean } | null>(null);
   const watcherRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Max price setting (persisted in localStorage)
+  const [maxPrice, setMaxPrice] = useState<string>("0.0799");
+  const [maxPriceInput, setMaxPriceInput] = useState<string>("0.0799");
+  const MAX_PRICE_KEY = "cbtl_max_price";
+
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
   const emailPollRef = useRef<NodeJS.Timeout | null>(null);
@@ -120,6 +125,13 @@ export default function CbtlRegisterPage() {
   useEffect(() => {
     fetchBalance();
     fetchEmails();
+
+    // Restore max price from localStorage
+    const savedPrice = localStorage.getItem(MAX_PRICE_KEY);
+    if (savedPrice) {
+      setMaxPrice(savedPrice);
+      setMaxPriceInput(savedPrice);
+    }
 
     // Restore persisted session
     try {
@@ -281,7 +293,7 @@ export default function CbtlRegisterPage() {
       const res = await fetch("/api/admin/cbtl-register/sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service: SERVICE })
+        body: JSON.stringify({ service: SERVICE, maxPrice: parseFloat(maxPrice) })
       });
       const d = await res.json();
       if (res.ok) {
@@ -377,7 +389,7 @@ export default function CbtlRegisterPage() {
 
   async function pollWatcher() {
     try {
-      const res = await fetch("/api/admin/number-watcher");
+      const res = await fetch("/api/admin/number-watcher?maxPrice=" + encodeURIComponent(maxPrice));
       if (!res.ok) return;
       const d = await res.json();
       setWatcherStatus({
@@ -462,6 +474,17 @@ export default function CbtlRegisterPage() {
 
   function copy(text: string, label: string) {
     navigator.clipboard.writeText(text).then(() => toast.success(`Copied ${label}`));
+  }
+
+  function saveMaxPrice() {
+    const val = parseFloat(maxPriceInput);
+    if (Number.isNaN(val) || val <= 0) {
+      toast.error("Invalid price.");
+      return;
+    }
+    setMaxPrice(String(val));
+    localStorage.setItem(MAX_PRICE_KEY, String(val));
+    toast.success("Max price updated to $" + val);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -581,6 +604,33 @@ export default function CbtlRegisterPage() {
               <p className="mt-1 text-xs text-amber-500">Telegram not configured</p>
             )}
           </div>
+        </div>
+
+        {/* Max price setting */}
+        <div className="mb-6 flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Max Price:
+          </label>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-slate-400">$</span>
+            <input
+              type="text"
+              value={maxPriceInput}
+              onChange={(e) => setMaxPriceInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveMaxPrice(); }}
+              className="w-24 rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              placeholder="0.0799"
+            />
+          </div>
+          <button
+            onClick={saveMaxPrice}
+            className="rounded border border-cyan-500 px-3 py-1 text-xs font-semibold text-cyan-600 hover:bg-cyan-50 dark:border-cyan-400 dark:text-cyan-400 dark:hover:bg-cyan-950"
+          >
+            Apply
+          </button>
+          <span className="text-xs text-slate-400">
+            Current: ${maxPrice}
+          </span>
         </div>
 
         {/* Main work area */}

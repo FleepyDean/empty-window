@@ -6,10 +6,10 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const { service } = await request.json().catch(() => ({}));
+  const { service, maxPrice } = await request.json().catch(() => ({}));
 
   try {
-    const result = await getNumberCheapest(service ?? "ot");
+    const result = await getNumberCheapest(service ?? "ot", typeof maxPrice === "number" ? maxPrice : undefined);
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

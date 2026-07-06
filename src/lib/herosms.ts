@@ -156,8 +156,8 @@ const U_MOBILE_OPERATOR = "u_mobile";
 // Services where U-Mobile preference is applied
 const U_MOBILE_PREFERRED_SERVICES = new Set(["aik", "ot"]);
 
-export async function getNumberCheapest(service = DEFAULT_SERVICE) {
-  const loyaltyPrice = LOYALTY_PRICES[service];
+export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPrice?: number) {
+  const loyaltyPrice = customMaxPrice ?? LOYALTY_PRICES[service];
   const preferUMobile = U_MOBILE_PREFERRED_SERVICES.has(service);
 
   if (loyaltyPrice !== undefined) {
