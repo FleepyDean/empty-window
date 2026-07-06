@@ -392,6 +392,11 @@ export default function CbtlRegisterPage() {
 
   async function takeReservedNumber() {
     if (!activeEmailId) { toast.error("Select an email first."); return; }
+    const email = emails.find((e) => e.id === activeEmailId);
+    if (email) {
+      copy(email.emailAddress, "email");
+      startEmailPolling(email.emailAddress);
+    }
     try {
       const res = await fetch("/api/admin/number-watcher", {
         method: "POST",
