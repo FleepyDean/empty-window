@@ -16,6 +16,7 @@ type SmsSession = {
   phoneNumber: string;
   otp: string | null;
   status: "waiting" | "success" | "cancelled";
+  price: number | null;
 };
 
 type AccountEntry = {
@@ -34,7 +35,7 @@ const SS_KEY = "cbtl_register_session";
 type PersistedSession = {
   activeEmailId: number;
   activeEmailAddress: string;
-  sms: { activationId: string; phoneNumber: string; otp: string | null; status: string } | null;
+  sms: { activationId: string; phoneNumber: string; otp: string | null; status: string; price: number | null } | null;
   smsRequestedAt: number | null;
   emailOtp: string | null;
   emailOtpStatus: string;
@@ -284,14 +285,14 @@ export default function CbtlRegisterPage() {
       });
       const d = await res.json();
       if (res.ok) {
-        const newSms = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" as const };
+        const newSms = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" as const, price: d.price ?? null };
         const requestedAt = Date.now();
         setSms(newSms);
         setElapsed(0);
         setSmsRequestedAt(requestedAt);
         saveSession({ sms: newSms, smsRequestedAt: requestedAt });
         startPolling(d.activationId);
-        toast.success(`Number assigned: ${d.phoneNumber}`);
+        toast.success(`Number assigned: ${d.phoneNumber}` + (d.price ? ` ($${d.price})` : ""));
       } else {
         toast.error(d.message ?? "Failed to get number.");
       }
@@ -405,14 +406,14 @@ export default function CbtlRegisterPage() {
       });
       const d = await res.json();
       if (!res.ok) { toast.error(d.message ?? "Failed to take reserved number."); return; }
-      const newSms: SmsSession = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" };
+      const newSms: SmsSession = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting", price: d.price ?? null };
       const requestedAt = Date.now();
       setSms(newSms);
       setSmsRequestedAt(requestedAt);
       setElapsed(0);
       saveSession({ sms: newSms, smsRequestedAt: requestedAt });
       startPolling(d.activationId);
-      toast.success(`Using reserved number: ${d.phoneNumber}`);
+      toast.success(`Using reserved number: ${d.phoneNumber}` + (d.price ? ` ($${d.price})` : ""));
     } catch {
       toast.error("Failed to take reserved number.");
     }
@@ -685,6 +686,9 @@ export default function CbtlRegisterPage() {
                     <span className="font-mono text-sm font-bold text-slate-800 dark:text-white">
                       {sms.phoneNumber.replace(/^6/, "")}
                     </span>
+                    {sms.price != null && (
+                      <span className="ml-1 text-xs text-slate-400">(${sms.price})</span>
+                    )}
                     <button
                       onClick={() => copy(sms.phoneNumber.replace(/^6/, ""), "phone number")}
                       className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"

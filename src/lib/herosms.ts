@@ -104,6 +104,16 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, op
     params.operator = operator;
   }
 
+  // Capture balance before purchase so we can compute the actual charged price via diff.
+  // maxPrice is only an upper-bound filter — HeroSMS may charge less than that.
+  let balanceBefore: number | null = null;
+  try {
+    const b = await getBalance();
+    balanceBefore = parseFloat(b.balance);
+  } catch {
+    balanceBefore = null;
+  }
+
   const raw = await heroRequest(params);
 
   // Expected: ACCESS_NUMBER:<id>:<number>
@@ -112,10 +122,25 @@ export async function getNumber(service = DEFAULT_SERVICE, maxPrice?: number, op
     throw new Error(`HeroSMS getNumber failed: ${raw}`);
   }
 
+  let price: number | null = null;
+  if (balanceBefore !== null) {
+    try {
+      const b = await getBalance();
+      const balanceAfter = parseFloat(b.balance);
+      const diff = balanceBefore - balanceAfter;
+      if (!Number.isNaN(diff) && diff > 0) {
+        price = Math.round(diff * 10000) / 10000;
+      }
+    } catch {
+      price = null;
+    }
+  }
+
   return {
     activationId: parts[1],
     phoneNumber: parts[2],
-    service
+    service,
+    price
   };
 }
 
@@ -140,7 +165,8 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE) {
     if (preferUMobile) {
       try {
         console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice} + operator=${U_MOBILE_OPERATOR}`);
-        return await getNumber(service, loyaltyPrice, U_MOBILE_OPERATOR);
+        const r = await getNumber(service, loyaltyPrice, U_MOBILE_OPERATOR);
+        return { ...r, price: r.price ?? loyaltyPrice };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -154,7 +180,8 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE) {
     // 2nd attempt: loyalty price, any operator
     try {
       console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice}`);
-      return await getNumber(service, loyaltyPrice);
+      const r = await getNumber(service, loyaltyPrice);
+      return { ...r, price: r.price ?? loyaltyPrice };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -168,7 +195,8 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE) {
     if (preferUMobile) {
       try {
         console.log(`[HeroSMS] getNumberCheapest service=${service} trying regular price + operator=${U_MOBILE_OPERATOR}`);
-        return await getNumber(service, undefined, U_MOBILE_OPERATOR);
+        const r = await getNumber(service, undefined, U_MOBILE_OPERATOR);
+        return { ...r, price: r.price };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -180,14 +208,16 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE) {
     }
 
     // Final fallback: any operator, any price
-    return getNumber(service);
+    const r = await getNumber(service);
+    return { ...r, price: r.price };
   }
 
   // For services without a loyalty price, try U-Mobile first then any
   if (preferUMobile) {
     try {
       console.log(`[HeroSMS] getNumberCheapest service=${service} trying operator=${U_MOBILE_OPERATOR}`);
-      return await getNumber(service, undefined, U_MOBILE_OPERATOR);
+      const r = await getNumber(service, undefined, U_MOBILE_OPERATOR);
+      return { ...r, price: r.price };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -198,7 +228,8 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE) {
     }
   }
 
-  return getNumber(service);
+  const r = await getNumber(service);
+  return { ...r, price: r.price };
 }
 
 export async function getOtp(activationId: string) {
