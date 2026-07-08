@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
 /**
- * Atomically reserve the oldest available EmailAccount and bind it to the claim.
+ * Atomically reserve the available EmailAccount with the earliest voucher
+ * expiry date and bind it to the claim. Accounts with no expiry are picked
+ * only after all dated accounts are exhausted.
  * Marks status="used" immediately — once an email is handed to a user, it's
  * retired permanently (because the user may have already typed it into CBTL).
  *
@@ -11,7 +13,7 @@ export async function assignEmailToClaim(claimId: string): Promise<string | null
   return prisma.$transaction(async (tx) => {
     const next = await tx.emailAccount.findFirst({
       where: { status: "available" },
-      orderBy: { id: "asc" }
+      orderBy: { voucherExpiresAt: { sort: "asc", nulls: "last" } }
     });
     if (!next) return null;
 
