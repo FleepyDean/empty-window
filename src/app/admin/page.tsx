@@ -772,7 +772,13 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         />
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-slate-900 dark:text-white">{order.orderId}</span>
+                          <a
+                            href={`/redeem?orderId=${order.orderId}`}
+                            target="_blank"
+                            className="font-mono text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+                          >
+                            {order.orderId}
+                          </a>
                           <button
                             onClick={() => navigator.clipboard.writeText(order.orderId).then(() => toast.success("Copied order ID"))}
                             className="text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400"

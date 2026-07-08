@@ -120,6 +120,8 @@ function RedeemPageContent() {
   const [claimingProduct, setClaimingProduct] = useState<OrderProduct | null>(null);
   const [revealedLinks, setRevealedLinks] = useState<Set<string>>(new Set());
   const [waitingForPhone, setWaitingForPhone] = useState(false);
+  const [claimCreatedAt, setClaimCreatedAt] = useState<number | null>(null);
+  const CLAIM_SETTLE_MS = 5000;
 
   const CANCEL_COOLDOWN_MS = 2 * 60 * 1000;
   const cancelElapsedMs = claimStartTime ? nowMs - claimStartTime : 0;
@@ -237,6 +239,7 @@ function RedeemPageContent() {
           setActiveClaim(null);
           setExpiresAt(null);
           setTimeLeftMs(0);
+          setClaimCreatedAt(null);
           clearActiveClaimId();
           clearInterval(poll);
         }
@@ -280,6 +283,7 @@ function RedeemPageContent() {
       setTimeLeftMs((data.expiresAt ?? Date.now() + CLAIM_DURATION_MS) - Date.now());
       setClaimState("waiting_otp");
       setWaitingForPhone(false);
+      setClaimCreatedAt(Date.now());
       toast.success(`Phone number ${data.phoneNumber} allocated. Waiting for SMS OTP.`);
     } catch {
       toast.error("Failed to get phone number. Please retry.");
@@ -363,6 +367,7 @@ function RedeemPageContent() {
       }
 
       setClaimStartTime(Date.now());
+      setClaimCreatedAt(Date.now());
       setActiveClaimId(data.claimId);
     } catch {
       toast.error("Claim failed. Please retry.");
@@ -474,7 +479,9 @@ function RedeemPageContent() {
       setExpiresAt(null);
       setTimeLeftMs(0);
       setOtp(null);
+      setEmailOtp(null);
       setClaimingProduct(null);
+      setClaimCreatedAt(null);
       clearActiveClaimId();
       toast.message(data.message);
     } catch {
@@ -563,6 +570,7 @@ function RedeemPageContent() {
           setActiveClaim(null);
           setExpiresAt(null);
           setTimeLeftMs(0);
+          setClaimCreatedAt(null);
           clearActiveClaimId();
           clearInterval(poll);
         }
@@ -709,6 +717,7 @@ function RedeemPageContent() {
             setClaimState("idle");
             setEmailOtp(null);
             setOtp(null);
+            setClaimCreatedAt(null);
             clearActiveClaimId();
           }
         }
@@ -793,12 +802,16 @@ function RedeemPageContent() {
 
     if (!waitingClaim) {
       // No server-side waiting claim. If we currently show one, clear it.
-      if (activeClaim && claimState === "waiting_otp") {
+      // Skip clearing during the settle window after a local claim creation to avoid
+      // a flicker while order details polling catches up with the server state.
+      const isSettling = claimCreatedAt && Date.now() - claimCreatedAt < CLAIM_SETTLE_MS;
+      if (activeClaim && claimState === "waiting_otp" && !isSettling) {
         setActiveClaim(null);
         setExpiresAt(null);
         setTimeLeftMs(0);
         setClaimState("idle");
         setClaimingProduct(null);
+        setClaimCreatedAt(null);
       }
       return;
     }
@@ -824,7 +837,7 @@ function RedeemPageContent() {
       const createdMs = new Date(waitingClaim.createdAt).getTime();
       setClaimStartTime(Number.isNaN(createdMs) ? Date.now() : createdMs);
     }
-  }, [orderDetails, activeClaim, claimState]);
+  }, [orderDetails, activeClaim, claimState, claimCreatedAt]);
 
   // Refresh order details after successful claim
   useEffect(() => {
