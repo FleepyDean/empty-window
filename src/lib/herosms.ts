@@ -156,21 +156,21 @@ const U_MOBILE_OPERATOR = "u_mobile";
 // Services where U-Mobile preference is applied
 const U_MOBILE_PREFERRED_SERVICES = new Set(["aik", "ot"]);
 
-export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPrice?: number) {
+export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPrice?: number, operatorPriority?: string) {
   const loyaltyPrice = customMaxPrice ?? LOYALTY_PRICES[service];
-  const preferUMobile = U_MOBILE_PREFERRED_SERVICES.has(service);
+  const preferredOperator = operatorPriority ?? (U_MOBILE_PREFERRED_SERVICES.has(service) ? U_MOBILE_OPERATOR : undefined);
 
   if (loyaltyPrice !== undefined) {
-    // 1st attempt: loyalty price + U-Mobile operator (if preferred)
-    if (preferUMobile) {
+    // 1st attempt: loyalty price + preferred operator
+    if (preferredOperator) {
       try {
-        console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice} + operator=${U_MOBILE_OPERATOR}`);
-        const r = await getNumber(service, loyaltyPrice, U_MOBILE_OPERATOR);
+        console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice} + operator=${preferredOperator}`);
+        const r = await getNumber(service, loyaltyPrice, preferredOperator);
         return { ...r, price: r.price ?? loyaltyPrice };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
-          console.log(`[HeroSMS] U-Mobile loyalty pool exhausted for ${service} (${msg}), trying any operator at loyalty price`);
+          console.log(`[HeroSMS] Preferred loyalty pool exhausted for ${service} (${msg}), trying any operator at loyalty price`);
         } else {
           throw err;
         }
@@ -191,16 +191,16 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
       }
     }
 
-    // 3rd attempt: regular price + U-Mobile (if preferred)
-    if (preferUMobile) {
+    // 3rd attempt: regular price + preferred operator
+    if (preferredOperator) {
       try {
-        console.log(`[HeroSMS] getNumberCheapest service=${service} trying regular price + operator=${U_MOBILE_OPERATOR}`);
-        const r = await getNumber(service, undefined, U_MOBILE_OPERATOR);
+        console.log(`[HeroSMS] getNumberCheapest service=${service} trying regular price + operator=${preferredOperator}`);
+        const r = await getNumber(service, undefined, preferredOperator);
         return { ...r, price: r.price };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
-          console.log(`[HeroSMS] U-Mobile regular pool exhausted for ${service} (${msg}), falling back to any operator`);
+          console.log(`[HeroSMS] Preferred regular pool exhausted for ${service} (${msg}), falling back to any operator`);
         } else {
           throw err;
         }
@@ -212,16 +212,16 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
     return { ...r, price: r.price };
   }
 
-  // For services without a loyalty price, try U-Mobile first then any
-  if (preferUMobile) {
+  // For services without a loyalty price, try the preferred operator first then any
+  if (preferredOperator) {
     try {
-      console.log(`[HeroSMS] getNumberCheapest service=${service} trying operator=${U_MOBILE_OPERATOR}`);
-      const r = await getNumber(service, undefined, U_MOBILE_OPERATOR);
+      console.log(`[HeroSMS] getNumberCheapest service=${service} trying operator=${preferredOperator}`);
+      const r = await getNumber(service, undefined, preferredOperator);
       return { ...r, price: r.price };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
-        console.log(`[HeroSMS] U-Mobile pool exhausted for ${service} (${msg}), falling back to any operator`);
+        console.log(`[HeroSMS] Preferred operator pool exhausted for ${service} (${msg}), falling back to any operator`);
       } else {
         throw err;
       }

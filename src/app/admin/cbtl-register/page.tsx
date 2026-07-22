@@ -80,7 +80,9 @@ export default function CbtlRegisterPage() {
   // Max price setting (persisted in localStorage)
   const [maxPrice, setMaxPrice] = useState<string>("0.0799");
   const [maxPriceInput, setMaxPriceInput] = useState<string>("0.0799");
+  const [operatorPriority, setOperatorPriority] = useState<string>("u_mobile");
   const MAX_PRICE_KEY = "cbtl_max_price";
+  const OPERATOR_PRIORITY_KEY = "cbtl_operator_priority";
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
@@ -132,6 +134,8 @@ export default function CbtlRegisterPage() {
       setMaxPrice(savedPrice);
       setMaxPriceInput(savedPrice);
     }
+    const savedOperator = localStorage.getItem(OPERATOR_PRIORITY_KEY);
+    if (savedOperator !== null) setOperatorPriority(savedOperator);
 
     // Restore persisted session
     try {
@@ -293,7 +297,11 @@ export default function CbtlRegisterPage() {
       const res = await fetch("/api/admin/cbtl-register/sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service: SERVICE, maxPrice: parseFloat(maxPrice) })
+        body: JSON.stringify({
+          service: SERVICE,
+          maxPrice: parseFloat(maxPrice),
+          operatorPriority: operatorPriority || undefined
+        })
       });
       const d = await res.json();
       if (res.ok) {
@@ -389,7 +397,9 @@ export default function CbtlRegisterPage() {
 
   async function pollWatcher() {
     try {
-      const res = await fetch("/api/admin/number-watcher?maxPrice=" + encodeURIComponent(maxPrice));
+      const params = new URLSearchParams({ maxPrice });
+      if (operatorPriority) params.set("operatorPriority", operatorPriority);
+      const res = await fetch("/api/admin/number-watcher?" + params.toString());
       if (!res.ok) return;
       const d = await res.json();
       setWatcherStatus({
@@ -485,6 +495,11 @@ export default function CbtlRegisterPage() {
     setMaxPrice(String(val));
     localStorage.setItem(MAX_PRICE_KEY, String(val));
     toast.success("Max price updated to $" + val);
+  }
+
+  function saveOperatorPriority(value: string) {
+    setOperatorPriority(value);
+    localStorage.setItem(OPERATOR_PRIORITY_KEY, value);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -600,8 +615,7 @@ export default function CbtlRegisterPage() {
           </div>
         </div>
 
-        {/* Max price setting */}
-        <div className="mb-6 flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-6 flex flex-wrap items-center gap-3 border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Max Price:
           </label>
@@ -622,9 +636,28 @@ export default function CbtlRegisterPage() {
           >
             Apply
           </button>
-          <span className="text-xs text-slate-400">
-            Current: ${maxPrice}
-          </span>
+          <span className="text-xs text-slate-400">Current: ${maxPrice}</span>
+          <span className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
+          <label htmlFor="operator-priority" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Operator Priority:
+          </label>
+          <select
+            id="operator-priority"
+            value={operatorPriority}
+            onChange={(e) => saveOperatorPriority(e.target.value)}
+            className="rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+          >
+            <option value="">Any operator</option>
+            <option value="hotlink">Hotlink</option>
+            <option value="tune_talk">Tune Talk</option>
+            <option value="xox">XOX</option>
+            <option value="celcom">Celcom</option>
+            <option value="yes">YES</option>
+            <option value="unifi">Unifi</option>
+            <option value="digi">DiGi</option>
+            <option value="u_mobile">U Mobile</option>
+            <option value="yoodo">Yoodo</option>
+          </select>
         </div>
 
         {/* Main work area */}

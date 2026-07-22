@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? parseFloat(maxPriceParam) : undefined;
+  const operatorPriority = searchParams.get("operatorPriority") || undefined;
   const service = "ot";
 
   let available = false;
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   } else {
     // The only reliable availability test: try to actually get a number.
     try {
-      const result = await getNumberCheapest(service, maxPrice);
+      const result = await getNumberCheapest(service, maxPrice, operatorPriority);
       reservedNumber = { activationId: result.activationId, phoneNumber: result.phoneNumber, price: result.price ?? null };
       available = true;
       console.log(`[NumberWatcher] Reserved number: ${result.phoneNumber} (${result.activationId})`);
