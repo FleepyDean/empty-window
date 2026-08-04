@@ -1,25 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifyWebhookSignature } from "@/lib/hitpay";
 
-// ToyyibPay webhook callback
+// HitPay webhook callback
+// HitPay sends JSON body with HMAC-SHA256 signature in Hitpay-Signature header
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    
-    const refNo = formData.get("refno") as string; // ToyyibPay reference
-    const status = formData.get("status") as string; // 1 = success, 0 = pending, 3 = fail
-    const reason = formData.get("reason") as string; // Failure reason
-    const billCode = formData.get("billcode") as string;
-    const orderId = formData.get("order_id") as string;
-    const amount = formData.get("amount") as string;
+    const rawBody = await request.text();
+    const signature = request.headers.get("hitpay-signature") ?? "";
 
-    if (!billCode || !orderId) {
+    // Verify webhook signature
+    if (!verifyWebhookSignature(rawBody, signature)) {
+      return NextResponse.json({ message: "Invalid signature" }, { status: 401 });
+    }
+
+    const data = JSON.parse(rawBody);
+
+    // HitPay payment_request webhook payload
+    const paymentRequestId = data.id as string;
+    const status = data.status as string; // "completed" | "failed" | "pending" | etc.
+    const referenceNumber = data.reference_number as string; // Our orderId
+
+    if (!paymentRequestId || !referenceNumber) {
       return NextResponse.json({ message: "Invalid callback data" }, { status: 400 });
     }
 
-    // Find payment record
+    // Find payment record by billCode (HitPay payment request ID)
     const payment = await prisma.payment.findUnique({
-      where: { billCode },
+      where: { billCode: paymentRequestId },
       include: { order: true },
     });
 
@@ -27,17 +35,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Payment not found" }, { status: 404 });
     }
 
-    // Update payment status based on callback
-    if (status === "1") {
+    if (status === "completed") {
       // Payment successful
       await prisma.$transaction([
         prisma.payment.update({
-          where: { billCode },
+          where: { billCode: paymentRequestId },
           data: {
             status: "paid",
             paidAt: new Date(),
-            transactionId: refNo,
-            metadata: JSON.stringify({ callbackAmount: amount, reason }),
+            transactionId: paymentRequestId,
+            metadata: JSON.stringify({ hitpayStatus: status, amount: data.amount }),
           },
         }),
         prisma.order.update({
@@ -45,19 +52,18 @@ export async function POST(request: Request) {
           data: { status: "paid" },
         }),
       ]);
-    } else if (status === "3") {
+    } else if (status === "failed") {
       // Payment failed
       await prisma.payment.update({
-        where: { billCode },
+        where: { billCode: paymentRequestId },
         data: {
           status: "failed",
-          metadata: JSON.stringify({ reason, callbackAmount: amount }),
+          metadata: JSON.stringify({ hitpayStatus: status, reason: data.status_reason ?? null }),
         },
       });
     }
 
     return NextResponse.json({ success: true });
-
   } catch (error) {
     console.error("Payment callback error:", error);
     return NextResponse.json(

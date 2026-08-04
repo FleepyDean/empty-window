@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createBill, getPaymentUrl } from "@/lib/toyyibpay";
+import { createPaymentRequest } from "@/lib/hitpay";
 import { getProductCatalogWithPrices, isProductKey } from "@/lib/products";
 import { generateOrderId } from "@/lib/orders";
 
@@ -77,9 +77,8 @@ export async function POST(request: Request) {
 
     // Calculate total amount
     const totalPrice = orderItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-    const amountInCents = Math.round(totalPrice * 100); // ToyyibPay expects cents
 
-    if (amountInCents < 100) { // Minimum RM 1.00
+    if (totalPrice < 1) { // Minimum RM 1.00
       return NextResponse.json({ message: "Minimum amount is RM 1.00." }, { status: 400 });
     }
 
@@ -123,32 +122,29 @@ export async function POST(request: Request) {
     });
 
     // Create bill description
-    let billDescription: string;
     let billProductName: string;
     if (isCartOrder) {
       billProductName = `Cart Order (${orderItems.length} items)`;
-      billDescription = orderItems.map((item) => `${item.productName} x${item.quantity}`).join(" + ");
     } else {
       billProductName = `${primaryItem.productName} x${primaryItem.quantity}`;
-      billDescription = `Purchase of ${primaryItem.quantity} ${primaryItem.productName} voucher(s)`;
     }
 
-    // Create ToyyibPay bill
-    const bill = await createBill({
-      productName: billProductName,
-      description: billDescription,
-      amount: amountInCents,
+    // Create HitPay payment request
+    const paymentRequest = await createPaymentRequest({
+      amount: totalPrice,
+      currency: "MYR",
       orderId: orderId,
-      customerName: customerName || "Customer",
-      customerEmail: customerEmail || "customer@example.com",
-      customerPhone: customerPhone || "0123456789",
+      productName: billProductName,
+      customerName: customerName || undefined,
+      customerEmail: customerEmail || undefined,
+      customerPhone: customerPhone || undefined,
     });
 
     // Create payment record
     await prisma.payment.create({
       data: {
         orderId: order.orderId,
-        billCode: bill.BillCode,
+        billCode: paymentRequest.id,
         billExternalRef: orderId,
         amount: totalPrice,
         status: "pending",
@@ -156,7 +152,7 @@ export async function POST(request: Request) {
     });
 
     // Return payment URL
-    const paymentUrl = getPaymentUrl(bill.BillCode);
+    const paymentUrl = paymentRequest.url;
 
     return NextResponse.json({
       success: true,
