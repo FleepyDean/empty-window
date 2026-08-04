@@ -10,7 +10,9 @@
     "db:push": "prisma db push",
     "prisma:generate": "prisma generate",
     "db:seed": "node prisma/seed.mjs",
-    "emails:import": "node scripts/import-emails.mjs"
+    "emails:import": "node scripts/import-emails.mjs",
+    "poller": "npx tsx scripts/shopee-poller.ts",
+    "poller:start": "tsx scripts/shopee-poller.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -34,6 +36,7 @@
     "postcss": "^8.4.49",
     "pptxgenjs": "^4.0.1",
     "tailwindcss": "^3.4.15",
+    "tsx": "^4.23.5",
     "typescript": "^5.6.3"
   }
 }
