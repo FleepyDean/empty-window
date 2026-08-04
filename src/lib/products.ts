@@ -223,7 +223,9 @@ export async function getProductCatalogWithPrices(): Promise<ProductConfig[]> {
 
   return PRODUCT_CATALOG.map((p) => {
     const o = overrideMap.get(p.key);
-    const price = o?.price !== null && o?.price !== undefined ? Number(o.price) : p.price;
+    const dbPrice = o?.price !== null && o?.price !== undefined ? Number(o.price) : null;
+    const priceFromLabel = o?.priceLabel ? parseFloat(o.priceLabel.replace(/[^0-9.]/g, "")) || 0 : null;
+    const price = dbPrice ?? priceFromLabel ?? p.price;
     const priceLabel = o?.priceLabel ?? (price > 0 ? `RM ${price.toFixed(2)}` : p.priceLabel);
     return {
       ...p,
