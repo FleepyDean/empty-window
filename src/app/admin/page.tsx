@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
-import Link from "next/link";
 import { ThemeToggle } from "@/components/theme";
 
 export default function AdminPage() {
