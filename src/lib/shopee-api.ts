@@ -82,21 +82,18 @@ export function buildAuthUrl(path: string): string {
 }
 
 /**
- * Build the new-style authorization link per Shopee's updated docs.
- * Uses the auth page (not API base) with auth_type and response_type params.
+ * Build the new Shopee Open Platform authorization page URL.
+ * No signature/timestamp required for the login page itself.
  */
 export function buildAuthorizationLink(redirectUri: string): string {
-  const { partnerId, partnerKey } = getShopeeConfig();
-  const timestamp = Math.floor(Date.now() / 1000);
-  const path = "/api/v2/shop/auth_partner";
-  const sign = generateSignature(path, timestamp, partnerKey, partnerId);
+  const { partnerId } = getShopeeConfig();
   const params = new URLSearchParams({
     partner_id: String(partnerId),
-    timestamp: String(timestamp),
-    sign,
-    redirect: redirectUri,
+    auth_type: "seller",
+    redirect_uri: redirectUri,
+    response_type: "code"
   });
-  return `${SHOPEE_AUTH_BASE}${path}?${params.toString()}`;
+  return `${SHOPEE_AUTH_BASE}/auth?${params.toString()}`;
 }
 
 export function getApiBase(): string {
