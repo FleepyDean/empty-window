@@ -8,10 +8,10 @@ const SHOPEE_API_BASE =
     ? "https://partner.shopeemobile.com"
     : "https://openplatform.sandbox.test-stable.shopee.sg";
 
-// Auth page base (different from API base in sandbox)
+// Auth page base (different from API base for new OAuth flow)
 const SHOPEE_AUTH_BASE =
   process.env.SHOPEE_ENV === "live"
-    ? "https://partner.shopeemobile.com"
+    ? "https://open.shopeemobile.com"
     : "https://open.test-stable.shopee.com";
 
 export function getShopeeConfig() {
