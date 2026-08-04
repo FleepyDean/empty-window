@@ -35,6 +35,34 @@ type ShopeeOrderDetailResponse = {
 
 const DEFAULT_STATUSES = ["READY_TO_SHIP", "PROCESSED"];
 const PAGE_SIZE = 50;
+const DEFAULT_LOOKBACK_HOURS = 24;
+
+// Given a list of Shopee order SNs, split into known (already in DB) and new.
+// Known rows missing externalRef are backfilled in the same pass.
+async function partitionKnownOrders(
+  orderSns: string[]
+): Promise<{ newSns: string[]; duplicateSns: string[] }> {
+  if (orderSns.length === 0) return { newSns: [], duplicateSns: [] };
+
+  const existingRows = await prisma.order.findMany({
+    where: { OR: [{ externalRef: { in: orderSns } }, { orderId: { in: orderSns } }] },
+    select: { orderId: true, externalRef: true }
+  });
+
+  const knownSet = new Set<string>();
+  for (const row of existingRows) {
+    knownSet.add(row.orderId);
+    if (row.externalRef) knownSet.add(row.externalRef);
+    // Backfill externalRef for legacy rows ingested before this field existed
+    if (!row.externalRef && orderSns.includes(row.orderId)) {
+      await prisma.order.update({ where: { orderId: row.orderId }, data: { externalRef: row.orderId } });
+    }
+  }
+
+  const newSns = orderSns.filter((sid) => !knownSet.has(sid));
+  const duplicateSns = orderSns.filter((sid) => knownSet.has(sid));
+  return { newSns, duplicateSns };
+}
 
 // Fetch all order SNs for a given status with pagination
 async function fetchOrderSnsForStatus(
@@ -103,17 +131,6 @@ async function fetchOrderDetails(orderSns: string[]): Promise<ShopeeOrderItem[]>
 
 async function ingestOrder(order: ShopeeOrderItem) {
   const sid = order.order_sn;
-
-  const existing = await prisma.order.findFirst({
-    where: { OR: [{ externalRef: sid }, { orderId: sid }] }
-  });
-  if (existing) {
-    // Backfill externalRef for legacy rows that were ingested before this field existed
-    if (!existing.externalRef) {
-      await prisma.order.update({ where: { orderId: existing.orderId }, data: { externalRef: sid } });
-    }
-    return { shopeeOrderId: sid, status: "duplicate" as const };
-  }
 
   const matched: Array<{
     productKey: string;
@@ -196,20 +213,28 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       statuses?: string[];
       days?: number;
+      hours?: number;
     };
 
-    const days = Math.min(body.days ?? 7, 30);
     const statuses = body.statuses?.length ? body.statuses : DEFAULT_STATUSES;
-    const timeFrom = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
+    const lookbackHours = body.hours ?? (body.days ? body.days * 24 : DEFAULT_LOOKBACK_HOURS);
+    const cappedHours = Math.min(lookbackHours, 30 * 24); // Shopee max 15 days per status call, enforced per-status below
     const timeTo = Math.floor(Date.now() / 1000);
+    const timeFrom = timeTo - cappedHours * 60 * 60;
+
+    // Shopee enforces max 15-day range per call; split into 15-day chunks if needed
+    const MAX_RANGE_SECONDS = 15 * 24 * 60 * 60;
 
     // Fetch order SNs for each requested status
     const allSns: string[] = [];
-    const statusSns: Record<string, string[]> = {};
     for (const status of statuses) {
-      const sns = await fetchOrderSnsForStatus(status, timeFrom, timeTo);
-      statusSns[status] = sns;
-      allSns.push(...sns);
+      let chunkStart = timeFrom;
+      while (chunkStart < timeTo) {
+        const chunkEnd = Math.min(chunkStart + MAX_RANGE_SECONDS, timeTo);
+        const sns = await fetchOrderSnsForStatus(status, chunkStart, chunkEnd);
+        allSns.push(...sns);
+        chunkStart = chunkEnd;
+      }
     }
 
     const uniqueSns = Array.from(new Set(allSns));
@@ -217,23 +242,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "No new orders to sync", synced: 0, statuses });
     }
 
-    const orders = await fetchOrderDetails(uniqueSns);
+    // Skip detail fetch for orders we already have (fast path for recurring cron runs)
+    const { newSns, duplicateSns } = await partitionKnownOrders(uniqueSns);
+
     const results: Array<{
       shopeeOrderId: string;
       status: "created" | "duplicate" | "skipped" | "failed";
       reason?: string;
-    }> = [];
+    }> = duplicateSns.map((sid) => ({ shopeeOrderId: sid, status: "duplicate" as const }));
 
-    for (const order of orders) {
-      try {
-        const result = await ingestOrder(order);
-        results.push(result);
-      } catch (err) {
-        results.push({
-          shopeeOrderId: order.order_sn,
-          status: "failed",
-          reason: err instanceof Error ? err.message : "DB error"
-        });
+    if (newSns.length > 0) {
+      const orders = await fetchOrderDetails(newSns);
+      for (const order of orders) {
+        try {
+          const result = await ingestOrder(order);
+          results.push(result);
+        } catch (err) {
+          results.push({
+            shopeeOrderId: order.order_sn,
+            status: "failed",
+            reason: err instanceof Error ? err.message : "DB error"
+          });
+        }
       }
     }
 

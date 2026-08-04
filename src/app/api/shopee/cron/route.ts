@@ -16,10 +16,12 @@ export async function POST(request: Request) {
     if (ingestSecret) headers["x-ingest-secret"] = ingestSecret;
 
     // 1. Sync orders from Shopee (READY_TO_SHIP + PROCESSED)
+    // Short lookback window since this runs every 5-10 min via cron.
+    // Already-known orders are skipped without hitting the detail API, so this stays fast.
     const syncRes = await fetch(`${baseUrl}/api/shopee/sync`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ statuses: ["READY_TO_SHIP", "PROCESSED"], days: 7 })
+      body: JSON.stringify({ statuses: ["READY_TO_SHIP", "PROCESSED"], hours: 2 })
     });
     const syncData = await syncRes.json().catch(() => ({ message: "Sync request failed" }));
 
