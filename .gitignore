@@ -16,3 +16,6 @@ yarn-error.log*
 
 # misc
 .DS_Store
+ship-test.json
+shopee-debug.json
+shopee-status-check.json
