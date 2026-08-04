@@ -122,9 +122,9 @@ type ProductPrice = {
   key: string;
   name: string;
   serviceCode: string;
+  price: number;
   priceLabel: string;
-  heroSmsCost: number | null;
-  availableCount: number | null;
+  availableQuantity: number;
 };
 
 type CartItem = {
@@ -201,6 +201,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [editPriceLabel, setEditPriceLabel] = useState("");
+  const [editAvailableQuantity, setEditAvailableQuantity] = useState(0);
   const [savingPrice, setSavingPrice] = useState(false);
 
   // Product Content editing
@@ -257,12 +258,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   function startPriceEdit(p: ProductPrice) {
     setEditingPrice(p.key);
-    const numeric = p.priceLabel.replace(/[^0-9.]/g, "");
+    const numeric = p.price.toFixed(2);
     setEditPriceLabel(numeric);
+    setEditAvailableQuantity(p.availableQuantity);
   }
 
   function cancelPriceEdit() {
     setEditingPrice(null);
+    setEditAvailableQuantity(0);
   }
 
   async function savePriceEdit(productKey: string) {
@@ -271,12 +274,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       const res = await fetch("/api/admin/prices", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productKey, priceLabel: `RM ${parseFloat(editPriceLabel || "0").toFixed(2)}` })
+        body: JSON.stringify({
+          productKey,
+          price: parseFloat(editPriceLabel || "0"),
+          availableQuantity: Math.max(0, Math.floor(Number(editAvailableQuantity) || 0))
+        })
       });
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
         setEditingPrice(null);
+        setEditAvailableQuantity(0);
         fetchPrices();
       } else {
         toast.error(data.message ?? "Update failed.");
@@ -940,14 +948,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         })()}
       </div>
 
-      {/* Product Prices - Collapsible
+      {/* Product Stock & Prices - Collapsible */}
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <button
           onClick={() => setShowProductPrices(!showProductPrices)}
           className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
         >
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">HeroSMS Product Prices</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Product Stock &amp; Prices</h2>
             <span className="text-xs text-slate-400">{showProductPrices ? "▼" : "▶"}</span>
           </div>
           {showProductPrices && (
@@ -967,8 +975,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Product</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Service Code</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Price</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Cost</th>
-                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Available Numbers</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Quantity</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Visible?</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
               </tr>
             </thead>
@@ -1003,19 +1011,34 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         <span className="font-semibold text-violet-600 dark:text-violet-400">{p.priceLabel}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 font-semibold text-cyan-600 dark:text-cyan-400">
-                      ${p.heroSmsCost !== null ? `${p.heroSmsCost}` : "—"}
-                    </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-block px-2 py-0.5 text-xs font-medium ${
-                          p.availableCount !== null && p.availableCount > 0
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : "bg-red-500/10 text-red-600 dark:text-red-400"
-                        }`}
-                      >
-                        {p.availableCount !== null ? p.availableCount : "—"}
-                      </span>
+                      {editingPrice === p.key ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editAvailableQuantity}
+                          onChange={(e) => setEditAvailableQuantity(parseInt(e.target.value, 10) || 0)}
+                          className="w-20 border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                        />
+                      ) : (
+                        <span
+                          className={`inline-block px-2 py-0.5 text-xs font-medium ${
+                            p.availableQuantity > 1
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "bg-red-500/10 text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {p.availableQuantity}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-xs">
+                      {p.availableQuantity > 1 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">Shown</span>
+                      ) : (
+                        <span className="text-red-600 dark:text-red-400">Hidden</span>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       {editingPrice === p.key ? (
@@ -1049,7 +1072,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </tbody>
           </table>
         </div>}
-      </div> */}
+      </div>
 
       {/* Product Content - Collapsible */}
       <div className="mt-6 border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

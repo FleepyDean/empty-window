@@ -1,5 +1,4 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { getPrices } from "@/lib/herosms";
 import { prisma } from "@/lib/prisma";
 import { getProductCatalogWithPrices, isProductKey } from "@/lib/products";
 import { NextResponse } from "next/server";
@@ -10,34 +9,16 @@ export async function GET() {
   }
 
   try {
-    const data = await getPrices();
-    // data.prices is { "<country>": { "<service>": { "cost": X, "count": Y } } }
-    // Flatten into per-product prices for our catalog
     const catalog = await getProductCatalogWithPrices();
-    const productPrices = catalog.map((product) => {
-      let cost: number | null = null;
-      let count: number | null = null;
-
-      // Search across all countries in response using heroServiceCode (not serviceCode)
-      for (const countryData of Object.values(data.prices)) {
-        const serviceData = (countryData as Record<string, { cost?: number; count?: number }>)[product.heroServiceCode];
-        if (serviceData) {
-          cost = serviceData.cost ?? null;
-          count = serviceData.count ?? null;
-          break;
-        }
-      }
-
-      return {
-        key: product.key,
-        name: product.name,
-        serviceCode: product.serviceCode,
-        heroServiceCode: product.heroServiceCode,
-        priceLabel: product.priceLabel,
-        heroSmsCost: cost,
-        availableCount: count
-      };
-    });
+    const productPrices = catalog.map((product) => ({
+      key: product.key,
+      name: product.name,
+      serviceCode: product.serviceCode,
+      heroServiceCode: product.heroServiceCode,
+      price: product.price,
+      priceLabel: product.priceLabel,
+      availableQuantity: product.availableQuantity,
+    }));
 
     return NextResponse.json({ productPrices });
   } catch (err) {
@@ -53,22 +34,28 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
   }
 
-  const { productKey, priceLabel } = await request.json();
+  const { productKey, price, availableQuantity } = await request.json();
 
   if (!productKey || !isProductKey(productKey)) {
     return NextResponse.json({ message: "Valid product key is required." }, { status: 400 });
   }
 
-  if (typeof priceLabel !== "string" || !priceLabel.trim()) {
-    return NextResponse.json({ message: "Price label is required." }, { status: 400 });
+  if (typeof price !== "number" || price < 0) {
+    return NextResponse.json({ message: "Price must be a non-negative number." }, { status: 400 });
   }
+
+  if (typeof availableQuantity !== "number" || availableQuantity < 0 || !Number.isInteger(availableQuantity)) {
+    return NextResponse.json({ message: "Quantity must be a non-negative integer." }, { status: 400 });
+  }
+
+  const priceLabel = `RM ${price.toFixed(2)}`;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (prisma as any).productSetting.upsert({
     where: { productKey },
-    update: { priceLabel: priceLabel.trim() },
-    create: { productKey, priceLabel: priceLabel.trim() }
+    update: { price, availableQuantity, priceLabel },
+    create: { productKey, price, availableQuantity, priceLabel }
   });
 
-  return NextResponse.json({ message: `Price updated for ${productKey}.` });
+  return NextResponse.json({ message: `Price and quantity updated for ${productKey}.` });
 }

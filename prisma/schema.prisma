@@ -99,6 +99,8 @@ model ProductSetting {
   id                     Int      @id @default(autoincrement())
   productKey             String   @unique
   priceLabel             String
+  price                  Decimal? // Price as number for admin editing; priceLabel is derived
+  availableQuantity      Int      @default(999) // Stock shown on homepage; 0-1 hides product
   redemptionInstructions String? // Overrides hardcoded instructions
   tutorialSteps          String? // JSON array of step strings
   tutorialVideoUrl       String? // YouTube embed URL

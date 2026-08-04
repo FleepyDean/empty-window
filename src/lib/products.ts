@@ -6,6 +6,8 @@ export type ProductConfig = {
   serviceCode: string;
   heroServiceCode: string; // HeroSMS service code (can be shared across products)
   priceLabel: string;
+  price: number;
+  availableQuantity: number;
   logoUrl: string;
   redemptionInstructions: string;
   productType: "otp" | "link" | "account" | "image";
@@ -183,16 +185,16 @@ const TEALIVE_VOUCHER_INSTRUCTIONS = `🎫 Tealive Voucher
 We do not take any responsibility for any errors caused by own failure to follow the steps above.`;
 
 export const PRODUCT_CATALOG: ProductConfig[] = [
-  { key: "cbtl", productType: "otp", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
-  { key: "kfc", productType: "otp", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
-  { key: "zus", productType: "otp", name: "ZUS Coffee", serviceCode: "aik", heroServiceCode: "aik", priceLabel: "RM 0.00", logoUrl: "https://resources.wobbjobs.com/jobs-malaysia/companies/2cced996-255d-4525-812b-e9319b8ce8f2/company_logo/original/13f90cff-059d-435e-b166-794a51360600-logo.jpg", redemptionInstructions: ZUS_INSTRUCTIONS },
-  { key: "tealive", productType: "otp", name: "Tealive", serviceCode: "avb", heroServiceCode: "avb", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_INSTRUCTIONS },
-  { key: "chagee", productType: "otp", name: "Chagee", serviceCode: "bwx", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s", redemptionInstructions: CHAGEE_INSTRUCTIONS },
-  { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS, productType: "otp" },
-  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://images.wincrunch.com/winrar-logo.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" },
-  { key: "luckin", name: "Luckin Coffee", serviceCode: "luckin", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://1000logos.net/wp-content/uploads/2025/09/Luckin-Coffee-Logo.png", redemptionInstructions: LUCKIN_INSTRUCTIONS, productType: "account", accountType: "luckin" },
-  { key: "tealive_rm5", name: "Tealive RM5 Voucher", serviceCode: "tealive_rm5", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_VOUCHER_INSTRUCTIONS, productType: "image" },
-  { key: "tealive_b1f1", name: "Tealive Buy 1 Free 1 Voucher", serviceCode: "tealive_b1f1", heroServiceCode: "", priceLabel: "RM 0.00", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_VOUCHER_INSTRUCTIONS, productType: "image" }
+  { key: "cbtl", productType: "otp", name: "Coffee Bean & Tea Leaf", serviceCode: "cbtl", heroServiceCode: "ot", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://play-lh.googleusercontent.com/Qmm4QXPiOycGYwkaF9QFX1qxZKdMYHp-Ff8x7meL_T_ExwRyOb0An4WYkt53eN_Itg", redemptionInstructions: CBTL_INSTRUCTIONS },
+  { key: "kfc", productType: "otp", name: "KFC", serviceCode: "fz", heroServiceCode: "fz", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://media.tenor.com/kkb548hIQfUAAAAe/kfc-logo.png", redemptionInstructions: KFC_INSTRUCTIONS },
+  { key: "zus", productType: "otp", name: "ZUS Coffee", serviceCode: "aik", heroServiceCode: "aik", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://resources.wobbjobs.com/jobs-malaysia/companies/2cced996-255d-4525-812b-e9319b8ce8f2/company_logo/original/13f90cff-059d-435e-b166-794a51360600-logo.jpg", redemptionInstructions: ZUS_INSTRUCTIONS },
+  { key: "tealive", productType: "otp", name: "Tealive", serviceCode: "avb", heroServiceCode: "avb", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_INSTRUCTIONS },
+  { key: "chagee", productType: "otp", name: "Chagee", serviceCode: "bwx", heroServiceCode: "ot", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT5oclmn4Q6h0t7hgLN8_S2N7QzrlczmdW0rw&s", redemptionInstructions: CHAGEE_INSTRUCTIONS },
+  { key: "gigi", name: "Gigi Coffee", serviceCode: "gigi", heroServiceCode: "ot", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://www.gigicoffee.com/wp-content/uploads/2023/04/logo-gigicoffee.png", redemptionInstructions: GIGI_INSTRUCTIONS, productType: "otp" },
+  { key: "winrar", name: "WinRAR", serviceCode: "winrar", heroServiceCode: "", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://images.wincrunch.com/winrar-logo.png", redemptionInstructions: WINRAR_INSTRUCTIONS, productType: "link", linkUrl: "https://drive.google.com/drive/folders/1oe2TmUmNGfG7iR5NK5e7E7NGdMemovK5?usp=sharing" },
+  { key: "luckin", name: "Luckin Coffee", serviceCode: "luckin", heroServiceCode: "", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://1000logos.net/wp-content/uploads/2025/09/Luckin-Coffee-Logo.png", redemptionInstructions: LUCKIN_INSTRUCTIONS, productType: "account", accountType: "luckin" },
+  { key: "tealive_rm5", name: "Tealive RM5 Voucher", serviceCode: "tealive_rm5", heroServiceCode: "", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_VOUCHER_INSTRUCTIONS, productType: "image" },
+  { key: "tealive_b1f1", name: "Tealive Buy 1 Free 1 Voucher", serviceCode: "tealive_b1f1", heroServiceCode: "", priceLabel: "RM 0.00", price: 0, availableQuantity: 999, logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEaSAISBahRRXbolEAdKw2fFKL6sqd0pOKyg&s", redemptionInstructions: TEALIVE_VOUCHER_INSTRUCTIONS, productType: "image" }
 ];
 
 export const PRODUCT_MAP: Record<ProductKey, ProductConfig> = PRODUCT_CATALOG.reduce(
@@ -213,15 +215,21 @@ export async function getProductCatalogWithPrices(): Promise<ProductConfig[]> {
   const overrides = await (prisma as any).productSetting.findMany() as {
     productKey: string;
     priceLabel: string;
+    price: number | null;
+    availableQuantity: number;
     redemptionInstructions?: string | null;
   }[];
   const overrideMap = new Map(overrides.map((o) => [o.productKey, o]));
 
   return PRODUCT_CATALOG.map((p) => {
     const o = overrideMap.get(p.key);
+    const price = o?.price !== null && o?.price !== undefined ? Number(o.price) : p.price;
+    const priceLabel = o?.priceLabel ?? (price > 0 ? `RM ${price.toFixed(2)}` : p.priceLabel);
     return {
       ...p,
-      priceLabel: o?.priceLabel ?? p.priceLabel,
+      price,
+      priceLabel,
+      availableQuantity: o?.availableQuantity ?? p.availableQuantity,
       redemptionInstructions: o?.redemptionInstructions ?? p.redemptionInstructions
     };
   });
