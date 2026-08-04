@@ -20,6 +20,14 @@ export async function GET(request: Request) {
   }
 
   try {
+    if (shippingParam === "shipment_list") {
+      const data = await shopeeGet<unknown>(
+        "/api/v2/order/get_shipment_list",
+        { cursor: "", page_size: 100 }
+      );
+      return NextResponse.json(data);
+    }
+
     if (shippingParam) {
       const data = await shopeeGet<unknown>(
         "/api/v2/logistics/get_shipping_parameter",
