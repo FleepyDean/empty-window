@@ -11,7 +11,7 @@ const SHOPEE_API_BASE =
 // Auth page base (different from API base for new OAuth flow)
 const SHOPEE_AUTH_BASE =
   process.env.SHOPEE_ENV === "live"
-    ? "https://open.shopeemobile.com"
+    ? "https://open.shopee.com"
     : "https://open.test-stable.shopee.com";
 
 export function getShopeeConfig() {
