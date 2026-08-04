@@ -9,15 +9,25 @@ type ShopeeOrderDetailResponse = {
 
 // TEMPORARY debug endpoint — returns raw Shopee order detail for inspection.
 // GET /api/shopee/debug-order?order_sn=xxx,yyy
+// GET /api/shopee/debug-order?order_sn=xxx&shipping_param=1
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const orderSns = searchParams.get("order_sn");
+  const shippingParam = searchParams.get("shipping_param");
 
   if (!orderSns) {
     return NextResponse.json({ message: "Provide order_sn query param" }, { status: 400 });
   }
 
   try {
+    if (shippingParam) {
+      const data = await shopeeGet<unknown>(
+        "/api/v2/logistics/get_shipping_parameter",
+        { order_sn: orderSns }
+      );
+      return NextResponse.json(data);
+    }
+
     const data = await shopeeGet<ShopeeOrderDetailResponse>(
       "/api/v2/order/get_order_detail",
       {
