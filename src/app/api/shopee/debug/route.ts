@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getShopeeConfig, getApiBase } from "@/lib/shopee-api";
+import { getShopeeConfig, getApiBase, buildAuthorizationLink } from "@/lib/shopee-api";
 import crypto from "crypto";
 
 // GET /api/shopee/debug — diagnose signature issues without exposing the key
@@ -12,8 +12,12 @@ export async function GET() {
     const base = `${partnerId}${path}${timestamp}`;
     const sign = crypto.createHmac("sha256", partnerKey).update(base).digest("hex");
 
+    const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://nishinae.store"}/api/shopee/auth`;
+    const authLink = buildAuthorizationLink(redirectUri);
+
     return NextResponse.json({
       apiBase: getApiBase(),
+      authLink,
       partnerId,
       partnerIdType: typeof partnerId,
       partnerKeyLength: partnerKey.length,

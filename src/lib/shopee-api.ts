@@ -1,11 +1,18 @@
 import crypto from "crypto";
 
-// Switch to live URL after Go Live approval:
-// https://partner.shopeemobile.com
+// Shopee Open Platform API base URLs (updated 2025)
+// Sandbox: https://openplatform.sandbox.test-stable.shopee.sg
+// Live:    https://partner.shopeemobile.com
 const SHOPEE_API_BASE =
   process.env.SHOPEE_ENV === "live"
     ? "https://partner.shopeemobile.com"
-    : "https://partner.test-stable.shopeemobile.com";
+    : "https://openplatform.sandbox.test-stable.shopee.sg";
+
+// Auth page base (different from API base in sandbox)
+const SHOPEE_AUTH_BASE =
+  process.env.SHOPEE_ENV === "live"
+    ? "https://partner.shopeemobile.com"
+    : "https://open.test-stable.shopee.com";
 
 export function getShopeeConfig() {
   const partnerId = Number(process.env.SHOPEE_PARTNER_ID);
@@ -72,6 +79,24 @@ export function buildAuthUrl(path: string): string {
     sign
   });
   return `${SHOPEE_API_BASE}${path}?${params.toString()}`;
+}
+
+/**
+ * Build the new-style authorization link per Shopee's updated docs.
+ * Uses the auth page (not API base) with auth_type and response_type params.
+ */
+export function buildAuthorizationLink(redirectUri: string): string {
+  const { partnerId, partnerKey } = getShopeeConfig();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const path = "/api/v2/shop/auth_partner";
+  const sign = generateSignature(path, timestamp, partnerKey, partnerId);
+  const params = new URLSearchParams({
+    partner_id: String(partnerId),
+    timestamp: String(timestamp),
+    sign,
+    redirect: redirectUri,
+  });
+  return `${SHOPEE_AUTH_BASE}${path}?${params.toString()}`;
 }
 
 export function getApiBase(): string {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildAuthUrl, getShopeeConfig } from "@/lib/shopee-api";
+import { buildAuthUrl, buildAuthorizationLink, getShopeeConfig } from "@/lib/shopee-api";
 
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://nishinae.store"}/api/shopee/auth`;
 
@@ -59,12 +59,9 @@ export async function GET(request: Request) {
     }
   }
 
-  // Step 1: Build Shopee authorization URL and redirect
+  // Step 1: Build Shopee authorization URL
   try {
-    const path = "/api/v2/shop/auth_partner";
-    const url = buildAuthUrl(path);
-    const authUrl = `${url}&redirect=${encodeURIComponent(REDIRECT_URI)}`;
-    // Return the URL as JSON too so it can be opened manually if redirect blocked
+    const authUrl = buildAuthorizationLink(REDIRECT_URI);
     return NextResponse.json({ authUrl, note: "Open authUrl in your browser to authorize" });
   } catch (err) {
     return NextResponse.json(
