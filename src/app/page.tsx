@@ -191,7 +191,7 @@ export default function StorePage() {
           Add products to cart, complete checkout and receive an order ID for redemption.
         </p>
 
-        {/* Cart Button
+        {/* Cart Button */}
         <button
           onClick={() => setIsCartOpen(true)}
           className="mt-6 flex items-center gap-2 border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-cyan-500 dark:hover:text-cyan-400"
@@ -240,7 +240,7 @@ export default function StorePage() {
               </div>
             </article>
           ))}
-        </div> */}
+        </div>
 
         <div className="mt-8 border-l-4 border-cyan-500 bg-slate-100 p-5 dark:bg-slate-800/50">
           <h3 className="text-lg font-semibold text-cyan-600 dark:text-cyan-400">Redeem Order</h3>
@@ -358,23 +358,31 @@ export default function StorePage() {
 
                 {/* Total */}
                 <div className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-700">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Subtotal</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">RM {calculateCartTotal().toFixed(2)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Processing Fee</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">RM 1.00</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 dark:border-slate-700">
-                    <span className="text-base font-semibold text-slate-900 dark:text-white">Total</span>
-                    <span className="text-xl font-bold text-cyan-600 dark:text-cyan-400">RM {(calculateCartTotal() + 1).toFixed(2)}</span>
-                  </div>
+                  {(() => {
+                    const feeRate = 0.012; // HitPay DuitNow QR ~1.2%
+                    const subtotal = calculateCartTotal();
+                    const fee = Math.max(0.01, subtotal * feeRate);
+                    return (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-600 dark:text-slate-400">Subtotal</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">RM {subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-sm text-slate-600 dark:text-slate-400">Est. HitPay Fee</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">RM {fee.toFixed(2)}</span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 dark:border-slate-700">
+                          <span className="text-base font-semibold text-slate-900 dark:text-white">Total</span>
+                          <span className="text-xl font-bold text-cyan-600 dark:text-cyan-400">RM {(subtotal + fee).toFixed(2)}</span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          Payment processing fee is estimated at ~1.2% (DuitNow QR) and is deducted from your payout, not charged to the customer separately.
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
-
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  ⚠️ RM 1.00 processing fee applies per transaction. Buy more items for better value!
-                </p>
 
                 <div className="mt-4 flex gap-3">
                   <button
