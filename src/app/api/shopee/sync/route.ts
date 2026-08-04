@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { shopeeGet, shopeePost } from "@/lib/shopee-api";
+import { shopeeGet } from "@/lib/shopee-api";
 import { prisma } from "@/lib/prisma";
 import { matchProductByKeyword } from "@/lib/product-matcher";
 
@@ -81,13 +81,13 @@ async function fetchOrderSnsForStatus(
 
 async function fetchOrderDetails(orderSns: string[]): Promise<ShopeeOrderItem[]> {
   const all: ShopeeOrderItem[] = [];
-  // API accepts up to 50 order SNs per call
+  // API accepts up to 50 order SNs per call. get_order_detail is a GET request.
   for (let i = 0; i < orderSns.length; i += 50) {
     const batch = orderSns.slice(i, i + 50);
-    const detailData = await shopeePost<ShopeeOrderDetailResponse>(
+    const detailData = await shopeeGet<ShopeeOrderDetailResponse>(
       "/api/v2/order/get_order_detail",
       {
-        order_sn_list: batch,
+        order_sn_list: batch.join(","),
         response_optional_fields: "item_list,order_status"
       }
     );
