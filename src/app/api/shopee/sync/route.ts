@@ -104,8 +104,14 @@ async function fetchOrderDetails(orderSns: string[]): Promise<ShopeeOrderItem[]>
 async function ingestOrder(order: ShopeeOrderItem) {
   const sid = order.order_sn;
 
-  const existing = await prisma.order.findUnique({ where: { externalRef: sid } });
+  const existing = await prisma.order.findFirst({
+    where: { OR: [{ externalRef: sid }, { orderId: sid }] }
+  });
   if (existing) {
+    // Backfill externalRef for legacy rows that were ingested before this field existed
+    if (!existing.externalRef) {
+      await prisma.order.update({ where: { orderId: existing.orderId }, data: { externalRef: sid } });
+    }
     return { shopeeOrderId: sid, status: "duplicate" as const };
   }
 

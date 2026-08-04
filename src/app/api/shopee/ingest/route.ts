@@ -64,9 +64,14 @@ export async function POST(request: Request) {
       continue;
     }
 
-    // Dedup by externalRef
-    const existing = await prisma.order.findUnique({ where: { externalRef: sid } });
+    // Dedup by externalRef or orderId (legacy rows may not have externalRef set)
+    const existing = await prisma.order.findFirst({
+      where: { OR: [{ externalRef: sid }, { orderId: sid }] },
+    });
     if (existing) {
+      if (!existing.externalRef) {
+        await prisma.order.update({ where: { orderId: existing.orderId }, data: { externalRef: sid } });
+      }
       results.push({
         shopeeOrderId: sid,
         status: "duplicate",
