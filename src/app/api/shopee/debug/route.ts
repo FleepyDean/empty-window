@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { getShopeeConfig, getApiBase, buildAuthorizationLink } from "@/lib/shopee-api";
+import { getApiBase, buildAuthorizationLink } from "@/lib/shopee-api";
+import { getShopeeEnv } from "@/lib/shopee-token";
 import crypto from "crypto";
 
 // GET /api/shopee/debug — diagnose signature issues without exposing the key
 export async function GET() {
   try {
-    const { partnerId, partnerKey, shopId, accessToken } = getShopeeConfig();
+    const { partnerId, partnerKey } = getShopeeEnv();
     const path = "/api/v2/shop/auth_partner";
     const timestamp = Math.floor(Date.now() / 1000);
 
@@ -25,8 +26,6 @@ export async function GET() {
       partnerKeyHasWhitespace: partnerKey !== partnerKey.trim(),
       partnerKeyFirst3: partnerKey.substring(0, 3),
       partnerKeyLast3: partnerKey.substring(partnerKey.length - 3),
-      shopId,
-      accessTokenPresent: !!accessToken,
       path,
       timestamp,
       baseString: base,

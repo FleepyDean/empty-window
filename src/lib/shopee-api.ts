@@ -1,84 +1,21 @@
-import crypto from "crypto";
+import { getShopeeEnv, getValidAccessToken, generateSignature, saveTokens } from "@/lib/shopee-token";
 
-// Shopee Open Platform API base URLs (updated 2025)
-// Sandbox: https://openplatform.sandbox.test-stable.shopee.sg
-// Live:    https://partner.shopeemobile.com
 const SHOPEE_API_BASE =
   process.env.SHOPEE_ENV === "live"
     ? "https://partner.shopeemobile.com"
     : "https://openplatform.sandbox.test-stable.shopee.sg";
 
-// Auth page base (different from API base for new OAuth flow)
 const SHOPEE_AUTH_BASE =
   process.env.SHOPEE_ENV === "live"
     ? "https://open.shopee.com"
     : "https://open.test-stable.shopee.com";
 
-export function getShopeeConfig() {
-  const partnerId = Number(process.env.SHOPEE_PARTNER_ID);
-  const partnerKey = process.env.SHOPEE_PARTNER_KEY ?? "";
-  const shopId = Number(process.env.SHOPEE_SHOP_ID ?? "0");
-  const accessToken = process.env.SHOPEE_ACCESS_TOKEN ?? "";
-
-  if (!partnerId || !partnerKey) {
-    throw new Error("Missing SHOPEE_PARTNER_ID or SHOPEE_PARTNER_KEY env vars");
-  }
-  return { partnerId, partnerKey, shopId, accessToken };
+export function getApiBase(): string {
+  return SHOPEE_API_BASE;
 }
 
-export function generateSignature(
-  path: string,
-  timestamp: number,
-  partnerKey: string,
-  partnerId: number,
-  accessToken?: string,
-  shopId?: number
-): string {
-  // SOP V2: partner_id + path + timestamp [+ access_token + shop_id]
-  let base = `${partnerId}${path}${timestamp}`;
-  if (accessToken && shopId) {
-    base += `${accessToken}${shopId}`;
-  }
-  return crypto.createHmac("sha256", partnerKey).update(base).digest("hex");
-}
-
-export function buildUrl(
-  path: string,
-  extraParams: Record<string, string | number> = {},
-  withShop = true
-): string {
-  const { partnerId, partnerKey, shopId, accessToken } = getShopeeConfig();
-  const timestamp = Math.floor(Date.now() / 1000);
-  const sign = generateSignature(
-    path,
-    timestamp,
-    partnerKey,
-    partnerId,
-    withShop ? accessToken : undefined,
-    withShop ? shopId : undefined
-  );
-
-  const params = new URLSearchParams({
-    partner_id: String(partnerId),
-    timestamp: String(timestamp),
-    sign,
-    ...(withShop && shopId ? { shop_id: String(shopId), access_token: accessToken } : {}),
-    ...Object.fromEntries(Object.entries(extraParams).map(([k, v]) => [k, String(v)]))
-  });
-
-  return `${SHOPEE_API_BASE}${path}?${params.toString()}`;
-}
-
-export function buildAuthUrl(path: string): string {
-  const { partnerId, partnerKey } = getShopeeConfig();
-  const timestamp = Math.floor(Date.now() / 1000);
-  const sign = generateSignature(path, timestamp, partnerKey, partnerId);
-  const params = new URLSearchParams({
-    partner_id: String(partnerId),
-    timestamp: String(timestamp),
-    sign
-  });
-  return `${SHOPEE_API_BASE}${path}?${params.toString()}`;
+export function getAuthBase(): string {
+  return SHOPEE_AUTH_BASE;
 }
 
 /**
@@ -86,7 +23,7 @@ export function buildAuthUrl(path: string): string {
  * No signature/timestamp required for the login page itself.
  */
 export function buildAuthorizationLink(redirectUri: string): string {
-  const { partnerId } = getShopeeConfig();
+  const { partnerId } = getShopeeEnv();
   const params = new URLSearchParams({
     partner_id: String(partnerId),
     auth_type: "seller",
@@ -96,16 +33,38 @@ export function buildAuthorizationLink(redirectUri: string): string {
   return `${SHOPEE_AUTH_BASE}/auth?${params.toString()}`;
 }
 
-export function getApiBase(): string {
-  return SHOPEE_API_BASE;
+export async function buildSignedApiUrl(
+  path: string,
+  extraParams: Record<string, string | number> = {}
+): Promise<string> {
+  const { partnerId, partnerKey } = getShopeeEnv();
+  const token = await getValidAccessToken();
+
+  if (!token) {
+    throw new Error("No valid Shopee access token. Authorize your shop first.");
+  }
+
+  const { shopId, accessToken } = token;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const sign = generateSignature(path, timestamp, partnerKey, partnerId, accessToken, shopId);
+
+  const params = new URLSearchParams({
+    partner_id: String(partnerId),
+    timestamp: String(timestamp),
+    sign,
+    shop_id: String(shopId),
+    access_token: accessToken,
+    ...Object.fromEntries(Object.entries(extraParams).map(([k, v]) => [k, String(v)]))
+  });
+
+  return `${SHOPEE_API_BASE}${path}?${params.toString()}`;
 }
 
 export async function shopeeGet<T>(
   path: string,
-  params: Record<string, string | number> = {},
-  withShop = true
+  params: Record<string, string | number> = {}
 ): Promise<T> {
-  const url = buildUrl(path, params, withShop);
+  const url = await buildSignedApiUrl(path, params);
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) throw new Error(`Shopee GET error ${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
@@ -116,7 +75,7 @@ export async function shopeePost<T>(
   body: Record<string, unknown>,
   params: Record<string, string | number> = {}
 ): Promise<T> {
-  const url = buildUrl(path, params, true);
+  const url = await buildSignedApiUrl(path, params);
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -126,3 +85,7 @@ export async function shopeePost<T>(
   if (!res.ok) throw new Error(`Shopee POST error ${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
 }
+
+// Backwards-compatible exports for token/signature helpers
+export { getShopeeEnv as getShopeeConfig, getValidAccessToken, generateSignature, saveTokens } from "@/lib/shopee-token";
+

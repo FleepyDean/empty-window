@@ -187,3 +187,17 @@ model LuckinAccount {
 
   @@index([status])
 }
+
+model ShopeeToken {
+  id            Int      @id @default(autoincrement())
+  shopId        BigInt   @unique
+  accessToken   String
+  refreshToken  String
+  accessTokenExpiresAt DateTime
+  refreshTokenExpiresAt DateTime?
+  environment   String   @default("live") // "live" or "test"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([environment])
+}

@@ -27,11 +27,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Find all active orders from Shopee that haven't been shipped yet
+    // Find all depleted Shopee orders (all claims fulfilled) that need to be shipped
     const orders = await prisma.order.findMany({
       where: {
         source: "shopee",
-        status: "active",
+        status: "depleted",
         externalRef: { not: null }
       },
       select: { orderId: true, externalRef: true }
