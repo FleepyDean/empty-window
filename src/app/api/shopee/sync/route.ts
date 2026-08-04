@@ -175,6 +175,7 @@ async function ingestOrder(order: ShopeeOrderItem) {
       orderId: sid,
       externalRef: sid,
       source: "shopee",
+      sourceDetail: "api",
       productKey: primary.productKey,
       productName: primary.productName,
       serviceCode: primary.serviceCode,

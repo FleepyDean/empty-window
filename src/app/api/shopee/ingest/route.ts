@@ -133,6 +133,7 @@ export async function POST(request: Request) {
           orderId: sid, // Use Shopee Order ID directly as our orderId
           externalRef: sid,
           source: "shopee",
+          sourceDetail: "uivision",
           productKey: primary.productKey,
           productName: primary.productName,
           serviceCode: primary.serviceCode,

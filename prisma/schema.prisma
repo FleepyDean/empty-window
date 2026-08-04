@@ -52,6 +52,7 @@ model Order {
   replacementCount Int         @default(0)
   status           OrderStatus @default(pending_payment)
   source           String      @default("web") // "web" | "shopee" | "admin"
+  sourceDetail     String?     // e.g. "api" | "uivision" | "manual"
   externalRef      String?     @unique // Shopee Order ID for dedup
   totalPrice       Decimal     @default(0)
   claims           Claim[]
