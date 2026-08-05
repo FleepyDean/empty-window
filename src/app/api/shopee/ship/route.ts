@@ -68,7 +68,6 @@ export async function POST(request: Request) {
         // Virtual goods: no pickup/dropoff needed
         if (!isVirtual && logList.length > 0) {
           // For non-virtual: use first logistics option with dropoff
-          shipBody.pickup = null;
           shipBody.dropoff = {};
         }
 

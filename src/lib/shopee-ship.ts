@@ -47,7 +47,6 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
     const shipBody: Record<string, unknown> = { order_sn: orderSn };
 
     if (!isVirtual && logList.length > 0) {
-      shipBody.pickup = null;
       shipBody.dropoff = {};
     }
 
