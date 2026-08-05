@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 // Holds a number reserved by the watcher so it can be handed to the registration flow.
 // If the user doesn't use it, we rely on them to cancel or the page can cancel it on unload.
-let reservedNumber: { activationId: string; phoneNumber: string; price: number | null } | null = null;
+let reservedNumber: { activationId: string; phoneNumber: string; price: number | null; operator: string | undefined } | null = null;
 
 // Telegram notification state
 let lastNotifiedAvailable = false;
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     // The only reliable availability test: try to actually get a number.
     try {
       const result = await getNumberCheapest(service, maxPrice, operatorPriority);
-      reservedNumber = { activationId: result.activationId, phoneNumber: result.phoneNumber, price: result.price ?? null };
+      reservedNumber = { activationId: result.activationId, phoneNumber: result.phoneNumber, price: result.price ?? null, operator: result.operator };
       available = true;
       console.log(`[NumberWatcher] Reserved number: ${result.phoneNumber} (${result.activationId})`);
     } catch (err) {

@@ -17,6 +17,7 @@ type SmsSession = {
   otp: string | null;
   status: "waiting" | "success" | "cancelled";
   price: number | null;
+  operator: string | null;
 };
 
 type AccountEntry = {
@@ -35,7 +36,7 @@ const SS_KEY = "cbtl_register_session";
 type PersistedSession = {
   activeEmailId: number;
   activeEmailAddress: string;
-  sms: { activationId: string; phoneNumber: string; otp: string | null; status: string; price: number | null } | null;
+  sms: { activationId: string; phoneNumber: string; otp: string | null; status: string; price: number | null; operator: string | null } | null;
   smsRequestedAt: number | null;
   emailOtp: string | null;
   emailOtpStatus: string;
@@ -51,6 +52,22 @@ function saveSession(data: Partial<PersistedSession>) {
 
 function clearSession() {
   try { sessionStorage.removeItem(SS_KEY); } catch { /* ignore */ }
+}
+
+const OPERATOR_LABELS: Record<string, string> = {
+  u_mobile: "U Mobile",
+  hotlink: "Hotlink",
+  tune_talk: "Tune Talk",
+  xox: "XOX",
+  celcom: "Celcom",
+  yes: "YES",
+  unifi: "Unifi",
+  digi: "DiGi",
+  yoodo: "Yoodo",
+};
+
+function formatOperator(op: string): string {
+  return OPERATOR_LABELS[op] ?? op;
 }
 
 export default function CbtlRegisterPage() {
@@ -306,7 +323,7 @@ export default function CbtlRegisterPage() {
       });
       const d = await res.json();
       if (res.ok) {
-        const newSms = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" as const, price: d.price ?? null };
+        const newSms = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting" as const, price: d.price ?? null, operator: d.operator ?? null };
         const requestedAt = Date.now();
         setSms(newSms);
         setElapsed(0);
@@ -461,7 +478,7 @@ export default function CbtlRegisterPage() {
       });
       const d = await res.json();
       if (!res.ok) { toast.error(d.message ?? "Failed to take reserved number."); return; }
-      const newSms: SmsSession = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting", price: d.price ?? null };
+      const newSms: SmsSession = { activationId: d.activationId, phoneNumber: d.phoneNumber, otp: null, status: "waiting", price: d.price ?? null, operator: d.operator ?? null };
       const requestedAt = Date.now();
       setSms(newSms);
       setSmsRequestedAt(requestedAt);
@@ -796,9 +813,14 @@ export default function CbtlRegisterPage() {
                     <span className="font-mono text-sm font-bold text-slate-800 dark:text-white">
                       {sms.phoneNumber.replace(/^6/, "")}
                     </span>
-                    {sms.price != null && (
-                      <span className="ml-1 text-xs text-slate-400">(${sms.price})</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {sms.operator && (
+                        <span className="text-xs text-slate-400">{formatOperator(sms.operator)}</span>
+                      )}
+                      {sms.price != null && (
+                        <span className="text-xs text-slate-400">(${sms.price})</span>
+                      )}
+                    </div>
                     <button
                       onClick={() => copy(sms.phoneNumber.replace(/^6/, ""), "phone number")}
                       className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"

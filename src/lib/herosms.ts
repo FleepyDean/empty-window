@@ -166,7 +166,7 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
       try {
         console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice} + operator=${preferredOperator}`);
         const r = await getNumber(service, loyaltyPrice, preferredOperator);
-        return { ...r, price: r.price ?? loyaltyPrice };
+        return { ...r, price: r.price ?? loyaltyPrice, operator: preferredOperator };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -181,7 +181,7 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
     try {
       console.log(`[HeroSMS] getNumberCheapest service=${service} trying loyalty price ${loyaltyPrice}`);
       const r = await getNumber(service, loyaltyPrice);
-      return { ...r, price: r.price ?? loyaltyPrice };
+      return { ...r, price: r.price ?? loyaltyPrice, operator: undefined };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -196,7 +196,7 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
       try {
         console.log(`[HeroSMS] getNumberCheapest service=${service} trying regular price + operator=${preferredOperator}`);
         const r = await getNumber(service, undefined, preferredOperator);
-        return { ...r, price: r.price };
+        return { ...r, price: r.price, operator: preferredOperator };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -209,7 +209,7 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
 
     // Final fallback: any operator, any price
     const r = await getNumber(service);
-    return { ...r, price: r.price };
+    return { ...r, price: r.price, operator: undefined };
   }
 
   // For services without a loyalty price, try the preferred operator first then any
@@ -217,7 +217,7 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
     try {
       console.log(`[HeroSMS] getNumberCheapest service=${service} trying operator=${preferredOperator}`);
       const r = await getNumber(service, undefined, preferredOperator);
-      return { ...r, price: r.price };
+      return { ...r, price: r.price, operator: preferredOperator };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("NO_NUMBERS") || msg.includes("WRONG_MAX_PRICE") || msg.includes("NOT_FOUND")) {
@@ -229,7 +229,7 @@ export async function getNumberCheapest(service = DEFAULT_SERVICE, customMaxPric
   }
 
   const r = await getNumber(service);
-  return { ...r, price: r.price };
+  return { ...r, price: r.price, operator: undefined };
 }
 
 export async function getOtp(activationId: string) {
