@@ -330,7 +330,7 @@ export default function CbtlRegisterPage() {
         setSmsRequestedAt(requestedAt);
         saveSession({ sms: newSms, smsRequestedAt: requestedAt });
         startPolling(d.activationId);
-        toast.success(`Number assigned: ${d.phoneNumber}` + (d.price ? ` ($${d.price})` : ""));
+        toast.success(`Number assigned: ${d.phoneNumber}` + (d.price ? ` ($${d.price})` : "") + (d.operator ? ` ${formatOperator(d.operator)}` : " Any operator"));
       } else {
         toast.error(d.message ?? "Failed to get number.");
       }
@@ -485,7 +485,7 @@ export default function CbtlRegisterPage() {
       setElapsed(0);
       saveSession({ sms: newSms, smsRequestedAt: requestedAt });
       startPolling(d.activationId);
-      toast.success(`Using reserved number: ${d.phoneNumber}` + (d.price ? ` ($${d.price})` : ""));
+      toast.success(`Using reserved number: ${d.phoneNumber}` + (d.price ? ` ($${d.price})` : "") + (d.operator ? ` ${formatOperator(d.operator)}` : " Any operator"));
     } catch {
       toast.error("Failed to take reserved number.");
     }
@@ -814,9 +814,9 @@ export default function CbtlRegisterPage() {
                       {sms.phoneNumber.replace(/^6/, "")}
                     </span>
                     <div className="flex items-center gap-2">
-                      {sms.operator && (
-                        <span className="text-xs text-slate-400">{formatOperator(sms.operator)}</span>
-                      )}
+                      <span className="text-xs text-slate-400">
+                        {sms.operator ? formatOperator(sms.operator) : "Any operator"}
+                      </span>
                       {sms.price != null && (
                         <span className="text-xs text-slate-400">(${sms.price})</span>
                       )}
