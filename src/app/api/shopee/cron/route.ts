@@ -25,13 +25,22 @@ export async function POST(request: Request) {
     });
     const syncData = await syncRes.json().catch(() => ({ message: "Sync request failed" }));
 
-    // Note: auto-ship is disabled. These are self-redeem virtual items that
-    // don't go through Shopee's standard logistics API (get_shipping_parameter /
-    // ship_order both fail with "not ready to ship" for this listing type).
-    // Shipping is done manually via the Shopee Seller Center "To Ship" page for now.
+    // 2. Auto-ship any depleted Shopee orders
+    let shipData: Record<string, unknown> | null = null;
+    try {
+      const shipRes = await fetch(`${baseUrl}/api/shopee/ship`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      shipData = await shipRes.json().catch(() => ({ message: "Ship request failed" }));
+    } catch {
+      shipData = { message: "Ship request failed" };
+    }
 
     return NextResponse.json({
       sync: syncData,
+      ship: shipData,
       ranAt: new Date().toISOString()
     });
   } catch (err) {

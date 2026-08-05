@@ -1,5 +1,6 @@
 import { fetchCbtlOtpForEmail } from "@/lib/email-otp";
 import { prisma } from "@/lib/prisma";
+import { shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
 import { NextResponse } from "next/server";
 
 /**
@@ -169,6 +170,7 @@ export async function POST(request: Request) {
           where: { orderId: updated.orderId },
           data: { status: "depleted" }
         });
+        shipShopeeOrderIfNeeded(updated.orderId).catch(() => {});
       }
     }
   } else {
@@ -178,6 +180,7 @@ export async function POST(request: Request) {
         where: { orderId: updated.orderId },
         data: { status: "depleted" }
       });
+      shipShopeeOrderIfNeeded(updated.orderId).catch(() => {});
     }
   }
 

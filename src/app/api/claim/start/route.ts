@@ -5,6 +5,7 @@ import { assignEmailToClaim } from "@/lib/email-pool";
 import { assignLuckinAccountToClaim } from "@/lib/luckin-pool";
 import { assignVoucherImageToClaim } from "@/lib/voucher-pool";
 import { PRODUCT_MAP } from "@/lib/products";
+import { shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
 import { NextResponse } from "next/server";
 
 const CBTL_PRODUCT_KEY = "cbtl";
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
           where: { orderId: trimmedOrderId },
           data: { status: "depleted" }
         });
+        shipShopeeOrderIfNeeded(trimmedOrderId).catch(() => {});
       }
       return NextResponse.json({ message: "Order is depleted. Cannot claim a new number." }, { status: 409 });
     }
@@ -275,6 +277,7 @@ export async function POST(request: Request) {
               where: { orderId: trimmedOrderId },
               data: { status: "depleted" }
             });
+            shipShopeeOrderIfNeeded(trimmedOrderId).catch(() => {});
           }
         }
       } else {
@@ -284,6 +287,7 @@ export async function POST(request: Request) {
             where: { orderId: trimmedOrderId },
             data: { status: "depleted" }
           });
+          shipShopeeOrderIfNeeded(trimmedOrderId).catch(() => {});
         }
       }
 
@@ -382,6 +386,7 @@ export async function POST(request: Request) {
               where: { orderId: trimmedOrderId },
               data: { status: "depleted" }
             });
+            shipShopeeOrderIfNeeded(trimmedOrderId).catch(() => {});
           }
         }
       } else {
@@ -391,6 +396,7 @@ export async function POST(request: Request) {
             where: { orderId: trimmedOrderId },
             data: { status: "depleted" }
           });
+          shipShopeeOrderIfNeeded(trimmedOrderId).catch(() => {});
         }
       }
 

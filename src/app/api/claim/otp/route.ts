@@ -1,5 +1,6 @@
 import { cancelNumber, getOtp } from "@/lib/herosms";
 import { prisma } from "@/lib/prisma";
+import { shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -182,6 +183,9 @@ export async function POST(request: Request) {
   if (!updatedClaim) {
     return NextResponse.json({ message: "Could not update claim." }, { status: 500 });
   }
+
+  // Auto-ship on Shopee if the order just became depleted
+  shipShopeeOrderIfNeeded(updatedClaim.orderId).catch(() => {});
 
   return NextResponse.json({
     status: "success",
