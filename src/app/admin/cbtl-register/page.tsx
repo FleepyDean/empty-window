@@ -63,6 +63,7 @@ export default function CbtlRegisterPage() {
   const [activeEmailId, setActiveEmailId] = useState<number | null>(null);
   const [sms, setSms] = useState<SmsSession | null>(null);
   const [smsLoading, setSmsLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [smsRequestedAt, setSmsRequestedAt] = useState<number | null>(null);
 
@@ -339,6 +340,38 @@ export default function CbtlRegisterPage() {
     setSmsRequestedAt(null);
     saveSession({ sms: null, smsRequestedAt: null });
     toast.success("Number cancelled.");
+  }
+
+  async function resendSms() {
+    if (!sms) return;
+    setResendLoading(true);
+    try {
+      const res = await fetch("/api/admin/cbtl-register/sms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: sms.activationId })
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setSms((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, otp: null, status: "waiting" as const };
+          saveSession({ sms: updated });
+          return updated;
+        });
+        setElapsed(0);
+        setSmsRequestedAt(Date.now());
+        saveSession({ smsRequestedAt: Date.now() });
+        startPolling(sms.activationId);
+        toast.success("Resend requested. Waiting for new SMS OTP...");
+      } else {
+        toast.error(d.message ?? "Failed to request resend.");
+      }
+    } catch {
+      toast.error("Failed to request resend.");
+    } finally {
+      setResendLoading(false);
+    }
   }
 
   async function markDone() {
@@ -814,16 +847,25 @@ export default function CbtlRegisterPage() {
             <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">SMS OTP</p>
               {sms?.otp ? (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-2xl font-bold tracking-widest text-emerald-600 dark:text-emerald-400">
                     {sms.otp}
                   </span>
-                  <button
-                    onClick={() => copy(sms.otp!, "SMS OTP")}
-                    className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
-                  >
-                    Copy
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={resendSms}
+                      disabled={resendLoading}
+                      className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-amber-500 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:border-amber-400 dark:hover:text-amber-400"
+                    >
+                      {resendLoading ? "Resending..." : "Resend SMS"}
+                    </button>
+                    <button
+                      onClick={() => copy(sms.otp!, "SMS OTP")}
+                      className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
+                    >
+                      Copy
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <p className="text-xs text-slate-400">

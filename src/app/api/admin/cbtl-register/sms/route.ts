@@ -1,5 +1,5 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { cancelNumber, getBalance, getNumberCheapest, getOtp } from "@/lib/herosms";
+import { cancelNumber, getBalance, getNumberCheapest, getOtp, resendOtp } from "@/lib/herosms";
 import { NextResponse } from "next/server";
 
 // POST /api/admin/cbtl-register/sms  — request a new phone number
@@ -57,6 +57,25 @@ export async function DELETE(request: Request) {
   } catch (err) {
     return NextResponse.json(
       { message: err instanceof Error ? err.message : "Failed to cancel number." },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/admin/cbtl-register/sms  — request SMS resend for an existing number
+export async function PUT(request: Request) {
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
+  const { id } = await request.json().catch(() => ({}));
+
+  if (!id) return NextResponse.json({ message: "id is required" }, { status: 400 });
+
+  try {
+    const result = await resendOtp(id);
+    return NextResponse.json(result);
+  } catch (err) {
+    return NextResponse.json(
+      { message: err instanceof Error ? err.message : "Failed to resend SMS." },
       { status: 500 }
     );
   }
