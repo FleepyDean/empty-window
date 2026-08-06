@@ -60,6 +60,8 @@ export async function POST(request: Request) {
         const logList = logisticsInfo.response?.logistics_info ?? [];
         const isVirtual = logList.some((l) => l.is_virtual_goods === true);
 
+        console.log(`[ShopeeShip] ${orderSn} logistics response:`, JSON.stringify(logisticsInfo));
+
         // Ship the order
         const shipBody: Record<string, unknown> = {
           order_sn: orderSn
@@ -71,10 +73,14 @@ export async function POST(request: Request) {
           shipBody.dropoff = {};
         }
 
+        console.log(`[ShopeeShip] ${orderSn} ship body:`, JSON.stringify(shipBody));
+
         const shipRes = await shopeePost<ShopeeShipResponse>(
           "/api/v2/logistics/ship_order",
           shipBody
         );
+
+        console.log(`[ShopeeShip] ${orderSn} ship response:`, JSON.stringify(shipRes));
 
         if (shipRes.error && shipRes.error !== "" && shipRes.error !== "error_none") {
           results.push({

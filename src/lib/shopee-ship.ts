@@ -44,16 +44,22 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
     const logList = logisticsInfo.response?.logistics_info ?? [];
     const isVirtual = logList.some((l) => l.is_virtual_goods === true);
 
+    console.log(`[ShopeeShip] ${orderSn} logistics response:`, JSON.stringify(logisticsInfo));
+
     const shipBody: Record<string, unknown> = { order_sn: orderSn };
 
     if (!isVirtual && logList.length > 0) {
       shipBody.dropoff = {};
     }
 
+    console.log(`[ShopeeShip] ${orderSn} ship body:`, JSON.stringify(shipBody));
+
     const shipRes = await shopeePost<ShopeeShipResponse>(
       "/api/v2/logistics/ship_order",
       shipBody
     );
+
+    console.log(`[ShopeeShip] ${orderSn} ship response:`, JSON.stringify(shipRes));
 
     if (shipRes.error && shipRes.error !== "" && shipRes.error !== "error_none") {
       console.error(`[ShopeeShip] Failed to ship ${orderSn}: ${shipRes.message ?? shipRes.error}`);
