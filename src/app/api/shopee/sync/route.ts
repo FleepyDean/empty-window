@@ -38,6 +38,12 @@ const CANCELLED_STATUS = "CANCELLED";
 const PAGE_SIZE = 50;
 const DEFAULT_LOOKBACK_HOURS = 24;
 
+// Throttle the bulk cancelled-order scan since it adds a full extra Shopee
+// order-list fetch. The real-time check in claim/start already protects
+// against claiming a cancelled order, so this is just a periodic backstop.
+const CANCELLED_CHECK_INTERVAL_MS = 60 * 1000;
+let lastCancelledCheckAt = 0;
+
 // Given a list of Shopee order SNs, split into known (already in DB) and new.
 // Known rows missing externalRef are backfilled in the same pass.
 async function partitionKnownOrders(
@@ -268,16 +274,23 @@ export async function POST(request: Request) {
       }
     }
 
-    // Always check for cancelled orders in the same time window
-    const cancelledSns: string[] = [];
-    let chunkStart = timeFrom;
-    while (chunkStart < timeTo) {
-      const chunkEnd = Math.min(chunkStart + MAX_RANGE_SECONDS, timeTo);
-      const sns = await fetchOrderSnsForStatus(CANCELLED_STATUS, chunkStart, chunkEnd);
-      cancelledSns.push(...sns);
-      chunkStart = chunkEnd;
+    // Periodically check for cancelled orders in the same time window. Throttled
+    // since this is an extra full Shopee API fetch and claim/start already does
+    // a real-time check before any claim is allowed.
+    let cancelledRemoval = { deleted: 0, skipped: 0 };
+    const now = Date.now();
+    if (now - lastCancelledCheckAt >= CANCELLED_CHECK_INTERVAL_MS) {
+      lastCancelledCheckAt = now;
+      const cancelledSns: string[] = [];
+      let chunkStart = timeFrom;
+      while (chunkStart < timeTo) {
+        const chunkEnd = Math.min(chunkStart + MAX_RANGE_SECONDS, timeTo);
+        const sns = await fetchOrderSnsForStatus(CANCELLED_STATUS, chunkStart, chunkEnd);
+        cancelledSns.push(...sns);
+        chunkStart = chunkEnd;
+      }
+      cancelledRemoval = await removeCancelledOrders(cancelledSns);
     }
-    const cancelledRemoval = await removeCancelledOrders(cancelledSns);
 
     const uniqueSns = Array.from(new Set(allSns));
     if (uniqueSns.length === 0) {

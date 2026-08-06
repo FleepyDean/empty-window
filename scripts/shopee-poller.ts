@@ -1,6 +1,6 @@
 const SYNC_URL = process.env.SYNC_URL || "https://nishinae.store/api/shopee/cron";
 const CRON_SECRET = process.env.SHOPEE_CRON_SECRET;
-const INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || "15000");
+const INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || "10000");
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
