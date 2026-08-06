@@ -24,6 +24,51 @@ type ShopeeLogisticsInfoResponse = {
   message?: string;
 };
 
+type ShopeeOrderStatusResponse = {
+  response?: {
+    order_list?: Array<{ order_status: string }>;
+  };
+  error?: string;
+  message?: string;
+};
+
+/**
+ * Check whether an active Shopee order has been cancelled by the buyer. If it
+ * has, delete it from our DB so it cannot be claimed. Returns true if the order
+ * was cancelled (and deleted). Returns false for non-Shopee orders, already
+ * shipped orders, or if the status check fails.
+ */
+export async function deleteOrderIfCancelledOnShopee(orderId: string): Promise<boolean> {
+  const order = await prisma.order.findUnique({
+    where: { orderId },
+    select: { source: true, externalRef: true, status: true, shippedOnShopee: true }
+  });
+
+  if (!order || order.source !== "shopee" || !order.externalRef) return false;
+  if (order.status !== "active" || order.shippedOnShopee) return false;
+
+  try {
+    const detail = await shopeeGet<ShopeeOrderStatusResponse>(
+      "/api/v2/order/get_order_detail",
+      {
+        order_sn_list: order.externalRef,
+        response_optional_fields: "order_status"
+      }
+    );
+
+    const status = detail.response?.order_list?.[0]?.order_status;
+    if (status === "CANCELLED") {
+      await prisma.order.delete({ where: { orderId } });
+      console.log(`[ShopeeShip] Deleted cancelled Shopee order ${orderId} (externalRef=${order.externalRef})`);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error(`[ShopeeShip] Failed to check Shopee status for ${orderId}:`, err);
+    return false;
+  }
+}
+
 /**
  * Mark an order as "shipped" once a claim starts so the Shopee order cannot be
  * cancelled by the buyer. For Shopee-sourced orders this also triggers the

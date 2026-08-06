@@ -5,7 +5,7 @@ import { assignEmailToClaim } from "@/lib/email-pool";
 import { assignLuckinAccountToClaim } from "@/lib/luckin-pool";
 import { assignVoucherImageToClaim } from "@/lib/voucher-pool";
 import { PRODUCT_MAP } from "@/lib/products";
-import { markOrderAsShippedIfActive, shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
+import { deleteOrderIfCancelledOnShopee, markOrderAsShippedIfActive, shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
 import { NextResponse } from "next/server";
 
 const CBTL_PRODUCT_KEY = "cbtl";
@@ -34,6 +34,14 @@ export async function POST(request: Request) {
 
   if (!order) {
     return NextResponse.json({ message: "Order not found." }, { status: 404 });
+  }
+
+  // For active Shopee orders, verify the order was not cancelled on Shopee.
+  if (order.source === "shopee" && order.status === "active" && !order.shippedOnShopee) {
+    const wasCancelled = await deleteOrderIfCancelledOnShopee(trimmedOrderId);
+    if (wasCancelled) {
+      return NextResponse.json({ message: "This order was cancelled on Shopee and cannot be claimed." }, { status: 409 });
+    }
   }
 
   // Determine if this is a cart order with OrderItems

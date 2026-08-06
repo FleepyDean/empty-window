@@ -34,6 +34,7 @@ type ShopeeOrderDetailResponse = {
 };
 
 const DEFAULT_STATUSES = ["READY_TO_SHIP", "PROCESSED"];
+const CANCELLED_STATUS = "CANCELLED";
 const PAGE_SIZE = 50;
 const DEFAULT_LOOKBACK_HOURS = 24;
 
@@ -62,6 +63,35 @@ async function partitionKnownOrders(
   const newSns = orderSns.filter((sid) => !knownSet.has(sid));
   const duplicateSns = orderSns.filter((sid) => knownSet.has(sid));
   return { newSns, duplicateSns };
+}
+
+// Delete active Shopee orders that were cancelled on Shopee before any claim was made.
+// Returns the number of deleted orders.
+async function removeCancelledOrders(orderSns: string[]): Promise<{ deleted: number; skipped: number }> {
+  if (orderSns.length === 0) return { deleted: 0, skipped: 0 };
+
+  const rows = await prisma.order.findMany({
+    where: {
+      OR: [{ externalRef: { in: orderSns } }, { orderId: { in: orderSns } }],
+      source: "shopee"
+    },
+    select: { orderId: true, externalRef: true, status: true, shippedOnShopee: true }
+  });
+
+  let deleted = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    // Only delete if the order is still active and has not been shipped on Shopee.
+    if (row.status !== "active" || row.shippedOnShopee) {
+      skipped++;
+      continue;
+    }
+    await prisma.order.delete({ where: { orderId: row.orderId } });
+    deleted++;
+    console.log(`[ShopeeSync] Deleted cancelled order ${row.orderId} (externalRef=${row.externalRef})`);
+  }
+
+  return { deleted, skipped };
 }
 
 // Fetch all order SNs for a given status with pagination
@@ -238,9 +268,25 @@ export async function POST(request: Request) {
       }
     }
 
+    // Always check for cancelled orders in the same time window
+    const cancelledSns: string[] = [];
+    let chunkStart = timeFrom;
+    while (chunkStart < timeTo) {
+      const chunkEnd = Math.min(chunkStart + MAX_RANGE_SECONDS, timeTo);
+      const sns = await fetchOrderSnsForStatus(CANCELLED_STATUS, chunkStart, chunkEnd);
+      cancelledSns.push(...sns);
+      chunkStart = chunkEnd;
+    }
+    const cancelledRemoval = await removeCancelledOrders(cancelledSns);
+
     const uniqueSns = Array.from(new Set(allSns));
     if (uniqueSns.length === 0) {
-      return NextResponse.json({ message: "No new orders to sync", synced: 0, statuses });
+      return NextResponse.json({
+        message: "No new orders to sync",
+        synced: 0,
+        statuses,
+        cancelled: cancelledRemoval
+      });
     }
 
     // Skip detail fetch for orders we already have (fast path for recurring cron runs)
@@ -274,6 +320,8 @@ export async function POST(request: Request) {
       duplicates: results.filter((r) => r.status === "duplicate").length,
       skipped: results.filter((r) => r.status === "skipped").length,
       failed: results.filter((r) => r.status === "failed").length,
+      cancelledDeleted: cancelledRemoval.deleted,
+      cancelledSkipped: cancelledRemoval.skipped,
       statuses
     };
 
