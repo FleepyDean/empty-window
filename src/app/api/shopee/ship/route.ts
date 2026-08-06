@@ -33,17 +33,35 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Find all Shopee orders that need to be shipped (depleted or already claimed
-    // but the Shopee ship API hasn't succeeded yet).
-    const orders = await prisma.order.findMany({
+    // Priority 1: freshly depleted orders (customer just claimed, needs shipping now).
+    // Unbounded since this list should stay small in normal operation.
+    const freshOrders = await prisma.order.findMany({
       where: {
         source: "shopee",
-        status: { in: ["depleted", "shipped"] },
+        status: "depleted",
         shippedOnShopee: false,
         externalRef: { not: null }
       },
       select: { orderId: true, externalRef: true }
     });
+
+    // Priority 2: legacy backlog already marked "shipped" in our DB but never
+    // confirmed shipped on Shopee's side. Only drain a small batch per cron run
+    // so a large backlog can never block fresh orders or time out the request.
+    const BACKLOG_BATCH_SIZE = 15;
+    const backlogOrders = await prisma.order.findMany({
+      where: {
+        source: "shopee",
+        status: "shipped",
+        shippedOnShopee: false,
+        externalRef: { not: null }
+      },
+      orderBy: { createdAt: "asc" },
+      take: BACKLOG_BATCH_SIZE,
+      select: { orderId: true, externalRef: true }
+    });
+
+    const orders = [...freshOrders, ...backlogOrders];
 
     if (orders.length === 0) {
       return NextResponse.json({ message: "No unshipped orders", shipped: 0 });
@@ -55,7 +73,16 @@ export async function POST(request: Request) {
       reason?: string;
     }> = [];
 
+    // Hard time budget so this endpoint can never hang the cron cycle, even if
+    // the fresh/priority queue unexpectedly grows large.
+    const TIME_BUDGET_MS = 20000;
+    const startedAt = Date.now();
+
     for (const order of orders) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        results.push({ shopeeOrderId: order.externalRef ?? order.orderId, status: "skipped", reason: "Time budget exceeded; will retry next cron run" });
+        continue;
+      }
       const orderSn = order.externalRef ?? order.orderId;
 
       try {
