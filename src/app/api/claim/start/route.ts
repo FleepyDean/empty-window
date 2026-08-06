@@ -5,7 +5,7 @@ import { assignEmailToClaim } from "@/lib/email-pool";
 import { assignLuckinAccountToClaim } from "@/lib/luckin-pool";
 import { assignVoucherImageToClaim } from "@/lib/voucher-pool";
 import { PRODUCT_MAP } from "@/lib/products";
-import { shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
+import { markOrderAsShippedIfActive, shipShopeeOrderIfNeeded } from "@/lib/shopee-ship";
 import { NextResponse } from "next/server";
 
 const CBTL_PRODUCT_KEY = "cbtl";
@@ -266,6 +266,8 @@ export async function POST(request: Request) {
         }
       });
 
+      markOrderAsShippedIfActive(trimmedOrderId).catch(() => {});
+
       // Check if order should be marked as depleted
       if (targetItemId) {
         const orderItem = await prisma.orderItem.findUnique({ where: { id: targetItemId } });
@@ -375,6 +377,8 @@ export async function POST(request: Request) {
         data: { status: "success" }
       });
 
+      markOrderAsShippedIfActive(trimmedOrderId).catch(() => {});
+
       // Check if order should be marked as depleted
       if (targetItemId) {
         const orderItem = await prisma.orderItem.findUnique({ where: { id: targetItemId } });
@@ -483,6 +487,8 @@ export async function POST(request: Request) {
         data: { emailAddress }
       });
 
+      markOrderAsShippedIfActive(trimmedOrderId).catch(() => {});
+
       return NextResponse.json({
         claimId: claim.claimId,
         phoneNumber: null,
@@ -532,6 +538,8 @@ export async function POST(request: Request) {
 
       return newClaim;
     });
+
+    markOrderAsShippedIfActive(trimmedOrderId).catch(() => {});
 
     return NextResponse.json({
       claimId: claim.claimId,

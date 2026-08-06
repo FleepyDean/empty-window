@@ -25,18 +25,42 @@ type ShopeeLogisticsInfoResponse = {
 };
 
 /**
- * If the given order is a depleted Shopee order, attempt to ship it via the
- * Shopee logistics API. On success the order status is updated to "shipped".
- * This is safe to call on any order — non-Shopee or non-depleted orders are
- * silently skipped.
+ * Mark an order as "shipped" once a claim starts so the Shopee order cannot be
+ * cancelled by the buyer. For Shopee-sourced orders this also triggers the
+ * logistics ship API. Safe to call multiple times — it is a no-op if the
+ * order is not active or already processed.
+ */
+export async function markOrderAsShippedIfActive(orderId: string): Promise<void> {
+  const order = await prisma.order.findUnique({
+    where: { orderId },
+    select: { source: true, status: true }
+  });
+
+  if (order?.status !== "active") return;
+
+  await prisma.order.update({
+    where: { orderId },
+    data: { status: "shipped" }
+  });
+
+  if (order.source === "shopee") {
+    shipShopeeOrderIfNeeded(orderId).catch(() => {});
+  }
+}
+
+/**
+ * If the given order is a Shopee order that needs to be shipped (status is
+ * "shipped" or "depleted" and shippedOnShopee is false), call the Shopee
+ * logistics API. On success, mark shippedOnShopee.
  */
 export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { orderId },
-    select: { source: true, externalRef: true, status: true },
+    select: { source: true, externalRef: true, status: true, shippedOnShopee: true },
   });
 
-  if (!order || order.source !== "shopee" || order.status !== "depleted") return;
+  if (!order || order.source !== "shopee" || (order.status !== "depleted" && order.status !== "shipped")) return;
+  if (order.shippedOnShopee) return;
   if (!order.externalRef) return;
 
   const orderSn = order.externalRef;
@@ -95,7 +119,7 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
 
     await prisma.order.update({
       where: { orderId },
-      data: { status: "shipped" },
+      data: { status: "shipped", shippedOnShopee: true },
     });
 
     console.log(`[ShopeeShip] Successfully shipped order ${orderSn}`);

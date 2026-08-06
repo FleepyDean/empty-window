@@ -51,6 +51,7 @@ model Order {
   isCartOrder      Boolean     @default(false)
   replacementCount Int         @default(0)
   status           OrderStatus @default(pending_payment)
+  shippedOnShopee  Boolean     @default(false) // Set after Shopee ship_order API succeeds
   source           String      @default("web") // "web" | "shopee" | "admin"
   sourceDetail     String?     // e.g. "api" | "uivision" | "manual"
   externalRef      String?     @unique // Shopee Order ID for dedup

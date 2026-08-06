@@ -30,11 +30,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Find all depleted Shopee orders (all claims fulfilled) that need to be shipped
+    // Find all Shopee orders that need to be shipped (depleted or already claimed
+    // but the Shopee ship API hasn't succeeded yet).
     const orders = await prisma.order.findMany({
       where: {
         source: "shopee",
-        status: "depleted",
+        status: { in: ["depleted", "shipped"] },
+        shippedOnShopee: false,
         externalRef: { not: null }
       },
       select: { orderId: true, externalRef: true }
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
         // Mark as shipped in our DB
         await prisma.order.update({
           where: { orderId: order.orderId },
-          data: { status: "shipped" }
+          data: { status: "shipped", shippedOnShopee: true }
         });
 
         results.push({ shopeeOrderId: orderSn, status: "shipped" });

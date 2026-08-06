@@ -25,6 +25,7 @@ export async function GET() {
   const stats = {
     total: orders.length,
     active: orders.filter((o) => o.status === "active").length,
+    shipped: orders.filter((o) => o.status === "shipped").length,
     depleted: orders.filter((o) => o.status === "depleted").length,
     totalQuantity: orders.reduce((sum, o) => sum + o.quantity, 0)
   };

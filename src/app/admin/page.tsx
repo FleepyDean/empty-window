@@ -113,6 +113,7 @@ type OrderRow = {
 type Stats = {
   total: number;
   active: number;
+  shipped: number;
   depleted: number;
   totalQuantity: number;
 };
@@ -521,7 +522,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {/* Stats Row */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-5">
         <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase tracking-wide text-slate-500">HeroSMS Balance</p>
           <p className="mt-1 text-xl font-bold text-cyan-600 dark:text-cyan-400">
@@ -542,6 +543,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase tracking-wide text-slate-500">Active</p>
           <p className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats?.active ?? "—"}</p>
+        </div>
+        <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Shipped</p>
+          <p className="mt-1 text-xl font-bold text-blue-600 dark:text-blue-400">{stats?.shipped ?? "—"}</p>
         </div>
         <div className="border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs uppercase tracking-wide text-slate-500">Remaining Quantity</p>
@@ -704,6 +709,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             >
               <option value="">All Status</option>
               <option value="active">Available</option>
+              <option value="shipped">Shipped</option>
               <option value="depleted">Depleted</option>
             </select>
             <div className="relative">
@@ -837,6 +843,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         className={`inline-block px-2 py-0.5 text-xs font-medium ${
                           order.status === "active"
                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : order.status === "shipped"
+                            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                             : "bg-red-500/10 text-red-600 dark:text-red-400"
                         }`}
                       >
