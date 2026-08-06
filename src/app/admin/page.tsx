@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme";
 
@@ -213,6 +213,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatusData | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const lastSyncAtRef = useRef<string | null>(null);
 
   // Add Order with cart
   const [newProductKey, setNewProductKey] = useState("cbtl");
@@ -519,7 +520,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     try {
       const res = await fetch("/api/admin/sync-status");
       const data = await res.json();
-      if (res.ok) setSyncStatus(data);
+      if (res.ok) {
+        const hadPrevious = lastSyncAtRef.current !== null;
+        const newSync = hadPrevious && data.lastSyncAt && data.lastSyncAt !== lastSyncAtRef.current;
+        if (newSync) {
+          fetchOrders();
+        }
+        lastSyncAtRef.current = data.lastSyncAt;
+        setSyncStatus(data);
+      }
     } catch {
       // silent fail
     } finally {
@@ -538,7 +547,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     fetchPrices();
     fetchProductContents();
     fetchSyncStatus();
-    const syncInterval = setInterval(fetchSyncStatus, 15000);
+    const syncInterval = setInterval(fetchSyncStatus, 5000);
     return () => clearInterval(syncInterval);
   }, []);
 
