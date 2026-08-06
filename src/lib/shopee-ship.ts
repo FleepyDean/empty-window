@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { shopeeGet, shopeePost } from "@/lib/shopee-api";
 
+// In-flight lock so concurrent calls for the same order don't all hit Shopee.
+const shippingLocks = new Set<string>();
+
 type ShopeeShipResponse = {
   error?: string;
   message?: string;
@@ -38,7 +41,23 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
 
   const orderSn = order.externalRef;
 
+  if (shippingLocks.has(orderId)) {
+    console.log(`[ShopeeShip] ${orderSn} already being processed by another call; skipping duplicate`);
+    return;
+  }
+  shippingLocks.add(orderId);
+
   try {
+    // Re-check status in case another concurrent call already shipped it.
+    const fresh = await prisma.order.findUnique({
+      where: { orderId },
+      select: { status: true }
+    });
+    if (fresh?.status !== "depleted") {
+      console.log(`[ShopeeShip] ${orderSn} status is ${fresh?.status ?? "missing"}; skipping`);
+      return;
+    }
+
     const logisticsInfo = await shopeeGet<ShopeeLogisticsInfoResponse>(
       "/api/v2/logistics/get_shipping_parameter",
       { order_sn: orderSn }
@@ -82,5 +101,7 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
     console.log(`[ShopeeShip] Successfully shipped order ${orderSn}`);
   } catch (err) {
     console.error(`[ShopeeShip] Error shipping ${orderSn}:`, err);
+  } finally {
+    shippingLocks.delete(orderId);
   }
 }
