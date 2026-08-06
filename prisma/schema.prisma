@@ -192,6 +192,16 @@ model LuckinAccount {
   @@index([status])
 }
 
+model SyncStatus {
+  id            Int      @id @default(1)
+  lastSyncAt    DateTime?
+  lastStatus    String   @default("pending") // "success" | "error" | "pending"
+  lastSummary   String?  // JSON string of sync summary
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model ShopeeToken {
   id            Int      @id @default(autoincrement())
   shopId        BigInt   @unique

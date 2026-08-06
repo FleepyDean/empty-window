@@ -96,6 +96,18 @@ type OrderItem = {
   remainingQty: number;
 };
 
+type ClaimRow = {
+  claimId: string;
+  status: string;
+  phoneNumber: string | null;
+  emailAddress: string | null;
+  otp: string | null;
+  emailOtp: string | null;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+};
+
 type OrderRow = {
   id: number;
   orderId: string;
@@ -104,10 +116,19 @@ type OrderRow = {
   serviceCode: string;
   quantity: number;
   status: string;
+  source: string;
   isCartOrder: boolean;
   createdAt: string;
   _count: { claims: number };
   items: OrderItem[];
+  claims: ClaimRow[];
+};
+
+type SyncStatusData = {
+  lastSyncAt: string | null;
+  lastStatus: string;
+  lastSummary: string | null;
+  lastError: string | null;
 };
 
 type Stats = {
@@ -189,6 +210,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncStatusData | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   // Add Order with cart
   const [newProductKey, setNewProductKey] = useState("cbtl");
@@ -490,6 +514,19 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  async function fetchSyncStatus() {
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/admin/sync-status");
+      const data = await res.json();
+      if (res.ok) setSyncStatus(data);
+    } catch {
+      // silent fail
+    } finally {
+      setSyncLoading(false);
+    }
+  }
+
   async function handleLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
     onLogout();
@@ -500,6 +537,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     fetchOrders();
     fetchPrices();
     fetchProductContents();
+    fetchSyncStatus();
+    const syncInterval = setInterval(fetchSyncStatus, 15000);
+    return () => clearInterval(syncInterval);
   }, []);
 
   return (
@@ -552,6 +592,55 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <p className="text-xs uppercase tracking-wide text-slate-500">Remaining Quantity</p>
           <p className="mt-1 text-xl font-bold text-violet-600 dark:text-violet-400">{stats?.totalQuantity ?? "—"}</p>
         </div>
+      </div>
+
+      {/* Shopee Sync Status */}
+      <div className="mt-4 flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+          syncStatus?.lastStatus === "success"
+            ? "bg-emerald-500"
+            : syncStatus?.lastStatus === "error"
+            ? "bg-red-500"
+            : "bg-amber-400"
+        } ${syncStatus?.lastStatus !== "error" ? "animate-pulse" : ""}`} />
+        <div className="flex-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Shopee Sync</p>
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            {syncLoading && !syncStatus ? "Checking..." : (
+              syncStatus?.lastSyncAt
+                ? <>
+                    <span className={
+                      syncStatus.lastStatus === "success"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : syncStatus.lastStatus === "error"
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-amber-600 dark:text-amber-400"
+                    }>
+                      {syncStatus.lastStatus === "success" ? "Healthy" : syncStatus.lastStatus === "error" ? "Error" : "Pending"}
+                    </span>
+                    {" · "}
+                    Last sync {new Date(syncStatus.lastSyncAt).toLocaleTimeString()}
+                    {syncStatus.lastStatus === "success" && syncStatus.lastSummary && (() => {
+                      try {
+                        const s = JSON.parse(syncStatus.lastSummary);
+                        return ` · ${s.created ?? 0} new, ${s.duplicates ?? 0} dup`;
+                      } catch { return ""; }
+                    })()}
+                    {syncStatus.lastStatus === "error" && syncStatus.lastError && (
+                      <span className="text-red-500"> · {syncStatus.lastError}</span>
+                    )}
+                  </>
+                : "Never synced"
+            )}
+          </p>
+        </div>
+        <button
+          onClick={fetchSyncStatus}
+          disabled={syncLoading}
+          className="text-xs text-cyan-600 hover:underline dark:text-cyan-400"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Account Pools Link */}
@@ -753,6 +842,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Products</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Total Qty</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+                <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 sm:table-cell">Source</th>
                 <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 sm:table-cell">Claims</th>
                 <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 md:table-cell">Created</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
@@ -761,11 +851,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <tbody>
               {ordersLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">Loading...</td>
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500">No orders found.</td>
                 </tr>
               ) : (
                 (orders.filter((o) => {
@@ -774,7 +864,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   if (statusFilter && o.status !== statusFilter) return false;
                   return true;
                 })
-                ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).map((order) => (
+                ).slice((ordersPage - 1) * ORDERS_PER_PAGE, ordersPage * ORDERS_PER_PAGE).flatMap((order) => [
                   <tr key={order.orderId} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-4 py-2">
                       {editingOrder === order.orderId ? (
@@ -851,7 +941,29 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         {order.status}
                       </span>
                     </td>
-                    <td className="hidden px-4 py-2 text-slate-500 sm:table-cell">{order._count.claims}</td>
+                    <td className="hidden px-4 py-2 sm:table-cell">
+                      <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
+                        order.source === "shopee"
+                          ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                          : order.source === "admin"
+                          ? "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                          : "bg-slate-500/10 text-slate-600 dark:text-slate-400"
+                      }`}>
+                        {order.source}
+                      </span>
+                    </td>
+                    <td className="hidden px-4 py-2 text-slate-500 sm:table-cell">
+                      {order._count.claims > 0 ? (
+                        <button
+                          onClick={() => setExpandedOrder(expandedOrder === order.orderId ? null : order.orderId)}
+                          className="text-cyan-600 hover:underline dark:text-cyan-400"
+                        >
+                          {order._count.claims} {expandedOrder === order.orderId ? "▾" : "▸"}
+                        </button>
+                      ) : (
+                        <span className="text-slate-400">0</span>
+                      )}
+                    </td>
                     <td className="hidden px-4 py-2 text-xs text-slate-500 md:table-cell">
                       {new Date(order.createdAt).toLocaleString()}
                     </td>
@@ -889,8 +1001,56 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         </div>
                       )}
                     </td>
-                  </tr>
-                ))
+                  </tr>,
+                  expandedOrder === order.orderId && order.claims && order.claims.length > 0 && (
+                    <tr key={`${order.orderId}-claims`} className="border-t border-slate-50 bg-slate-50/50 dark:border-slate-800/50 dark:bg-slate-800/30">
+                      <td colSpan={8} className="px-4 py-3">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="text-slate-400">
+                                <th className="py-1 pr-4 font-medium">Claim ID</th>
+                                <th className="py-1 pr-4 font-medium">Status</th>
+                                <th className="py-1 pr-4 font-medium">Phone</th>
+                                <th className="py-1 pr-4 font-medium">Email</th>
+                                <th className="py-1 pr-4 font-medium">OTP</th>
+                                <th className="py-1 pr-4 font-medium">Created</th>
+                                <th className="py-1 pr-4 font-medium">Updated</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {order.claims.map((claim) => (
+                                <tr key={claim.claimId} className="border-t border-slate-200/60 dark:border-slate-700/50">
+                                  <td className="py-1.5 pr-4 font-mono text-slate-600 dark:text-slate-400">{claim.claimId}</td>
+                                  <td className="py-1.5 pr-4">
+                                    <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
+                                      claim.status === "success"
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                        : claim.status === "waiting_otp"
+                                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                        : claim.status === "expired"
+                                        ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                                        : claim.status === "cancelled"
+                                        ? "bg-slate-500/10 text-slate-500"
+                                        : "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                                    }`}>
+                                      {claim.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-1.5 pr-4 text-slate-600 dark:text-slate-400">{claim.phoneNumber ?? "—"}</td>
+                                  <td className="py-1.5 pr-4 text-slate-600 dark:text-slate-400">{claim.emailAddress ?? "—"}</td>
+                                  <td className="py-1.5 pr-4 text-slate-600 dark:text-slate-400">{claim.otp ?? claim.emailOtp ?? "—"}</td>
+                                  <td className="py-1.5 pr-4 text-slate-500">{new Date(claim.createdAt).toLocaleString()}</td>
+                                  <td className="py-1.5 pr-4 text-slate-500">{new Date(claim.updatedAt).toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ])
               )}
             </tbody>
           </table>

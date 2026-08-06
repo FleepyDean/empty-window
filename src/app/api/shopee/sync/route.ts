@@ -248,6 +248,22 @@ export async function POST(request: Request) {
 
     const uniqueSns = Array.from(new Set(allSns));
     if (uniqueSns.length === 0) {
+      const emptySummary = { total: 0, created: 0, duplicates: 0, skipped: 0, failed: 0, statuses };
+      await prisma.syncStatus.upsert({
+        where: { id: 1 },
+        update: {
+          lastSyncAt: new Date(),
+          lastStatus: "success",
+          lastSummary: JSON.stringify(emptySummary),
+          lastError: null
+        },
+        create: {
+          id: 1,
+          lastSyncAt: new Date(),
+          lastStatus: "success",
+          lastSummary: JSON.stringify(emptySummary)
+        }
+      });
       return NextResponse.json({
         message: "No new orders to sync",
         synced: 0,
@@ -289,10 +305,41 @@ export async function POST(request: Request) {
       statuses
     };
 
+    await prisma.syncStatus.upsert({
+      where: { id: 1 },
+      update: {
+        lastSyncAt: new Date(),
+        lastStatus: "success",
+        lastSummary: JSON.stringify(summary),
+        lastError: null
+      },
+      create: {
+        id: 1,
+        lastSyncAt: new Date(),
+        lastStatus: "success",
+        lastSummary: JSON.stringify(summary)
+      }
+    });
+
     return NextResponse.json({ summary, results });
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "Sync failed";
+    await prisma.syncStatus.upsert({
+      where: { id: 1 },
+      update: {
+        lastSyncAt: new Date(),
+        lastStatus: "error",
+        lastError: errorMsg
+      },
+      create: {
+        id: 1,
+        lastSyncAt: new Date(),
+        lastStatus: "error",
+        lastError: errorMsg
+      }
+    }).catch(() => {});
     return NextResponse.json(
-      { message: err instanceof Error ? err.message : "Sync failed" },
+      { message: errorMsg },
       { status: 500 }
     );
   }

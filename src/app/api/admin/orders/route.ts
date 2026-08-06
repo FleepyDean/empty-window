@@ -18,7 +18,21 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { claims: true } },
-      items: true
+      items: true,
+      claims: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          claimId: true,
+          status: true,
+          phoneNumber: true,
+          emailAddress: true,
+          otp: true,
+          emailOtp: true,
+          createdAt: true,
+          updatedAt: true,
+          expiresAt: true
+        }
+      }
     }
   });
 
