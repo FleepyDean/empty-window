@@ -34,15 +34,16 @@ type ShopeeOrderDetailResponse = {
 };
 
 const DEFAULT_STATUSES = ["READY_TO_SHIP", "PROCESSED"];
-const CANCELLED_STATUS = "CANCELLED";
 const PAGE_SIZE = 50;
 const DEFAULT_LOOKBACK_HOURS = 24;
 
-// Throttle the bulk cancelled-order scan since it adds a full extra Shopee
-// order-list fetch. The real-time check in claim/start already protects
-// against claiming a cancelled order, so this is just a periodic backstop.
-const CANCELLED_CHECK_INTERVAL_MS = 60 * 1000;
-let lastCancelledCheckAt = 0;
+// NOTE: Bulk CANCELLED order scanning was removed from this route — it added
+// a full extra Shopee order-list fetch on every sync run and caused new
+// orders to be delayed by minutes. Cancelled-order protection is handled
+// per-order in real time by deleteOrderIfCancelledOnShopee() in
+// src/lib/shopee-ship.ts, called from /api/claim/start right before a claim
+// is allowed to proceed. That check is cheap (single order lookup) and only
+// runs when a customer actually attempts to claim.
 
 // Given a list of Shopee order SNs, split into known (already in DB) and new.
 // Known rows missing externalRef are backfilled in the same pass.
@@ -69,61 +70,6 @@ async function partitionKnownOrders(
   const newSns = orderSns.filter((sid) => !knownSet.has(sid));
   const duplicateSns = orderSns.filter((sid) => knownSet.has(sid));
   return { newSns, duplicateSns };
-}
-
-// Fire-and-forget cancelled-order scan. Runs at most once per
-// CANCELLED_CHECK_INTERVAL_MS and is never awaited by the caller so a slow
-// Shopee response can never delay new-order ingestion.
-function scheduleCancelledCheck(timeFrom: number, timeTo: number, maxRangeSeconds: number): void {
-  const now = Date.now();
-  if (now - lastCancelledCheckAt < CANCELLED_CHECK_INTERVAL_MS) return;
-  lastCancelledCheckAt = now;
-
-  (async () => {
-    const cancelledSns: string[] = [];
-    let chunkStart = timeFrom;
-    while (chunkStart < timeTo) {
-      const chunkEnd = Math.min(chunkStart + maxRangeSeconds, timeTo);
-      const sns = await fetchOrderSnsForStatus(CANCELLED_STATUS, chunkStart, chunkEnd);
-      cancelledSns.push(...sns);
-      chunkStart = chunkEnd;
-    }
-    const result = await removeCancelledOrders(cancelledSns);
-    if (result.deleted > 0) {
-      console.log(`[ShopeeSync] Background cancelled-check deleted ${result.deleted} order(s)`);
-    }
-  })().catch((err) => {
-    console.error("[ShopeeSync] Background cancelled-check failed:", err);
-  });
-}
-
-// Delete active Shopee orders that were cancelled on Shopee before any claim was made.
-// Returns the number of deleted orders.
-async function removeCancelledOrders(orderSns: string[]): Promise<{ deleted: number; skipped: number }> {
-  if (orderSns.length === 0) return { deleted: 0, skipped: 0 };
-
-  const rows = await prisma.order.findMany({
-    where: {
-      OR: [{ externalRef: { in: orderSns } }, { orderId: { in: orderSns } }],
-      source: "shopee"
-    },
-    select: { orderId: true, externalRef: true, status: true, shippedOnShopee: true }
-  });
-
-  let deleted = 0;
-  let skipped = 0;
-  for (const row of rows) {
-    // Only delete if the order is still active and has not been shipped on Shopee.
-    if (row.status !== "active" || row.shippedOnShopee) {
-      skipped++;
-      continue;
-    }
-    await prisma.order.delete({ where: { orderId: row.orderId } });
-    deleted++;
-    console.log(`[ShopeeSync] Deleted cancelled order ${row.orderId} (externalRef=${row.externalRef})`);
-  }
-
-  return { deleted, skipped };
 }
 
 // Fetch all order SNs for a given status with pagination
@@ -299,11 +245,6 @@ export async function POST(request: Request) {
         chunkStart = chunkEnd;
       }
     }
-
-    // Kick off the cancelled-order backstop scan in the background. This never
-    // blocks the response — new-order ingestion below always completes first,
-    // regardless of how slow Shopee's CANCELLED status list is to return.
-    scheduleCancelledCheck(timeFrom, timeTo, MAX_RANGE_SECONDS);
 
     const uniqueSns = Array.from(new Set(allSns));
     if (uniqueSns.length === 0) {
