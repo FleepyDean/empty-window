@@ -32,6 +32,65 @@ type ShopeeOrderStatusResponse = {
   message?: string;
 };
 
+type ShopeeOrderDetailForBuyerResponse = {
+  response?: {
+    order_list?: Array<{ buyer_user_id?: number; order_sn: string }>;
+  };
+  error?: string;
+  message?: string;
+};
+
+type ShopeeSendMessageResponse = {
+  error?: string;
+  message?: string;
+  response?: {
+ request_id?: string;
+  };
+};
+
+const THANK_YOU_MESSAGE = "Thank you! Please click order received and rate us 5 stars yaa \uD83D\uDC95";
+
+/**
+ * Send a chat message to the buyer of a Shopee order via the Seller Chat API.
+ * Fetches buyer_user_id from get_order_detail, then calls sellerchat/send_message.
+ * Fails gracefully — only logs errors, never throws.
+ */
+export async function sendShopeeChatMessage(orderSn: string, text: string): Promise<void> {
+  try {
+    const detail = await shopeeGet<ShopeeOrderDetailForBuyerResponse>(
+      "/api/v2/order/get_order_detail",
+      {
+        order_sn_list: orderSn,
+        response_optional_fields: "buyer_user_id"
+      }
+    );
+
+    const buyerUserId = detail.response?.order_list?.[0]?.buyer_user_id;
+    if (!buyerUserId) {
+      console.log(`[ShopeeChat] No buyer_user_id for ${orderSn}; skipping message`);
+      return;
+    }
+
+    const sendRes = await shopeePost<ShopeeSendMessageResponse>(
+      "/api/v2/sellerchat/send_message",
+      {
+        to_id: buyerUserId,
+        message_type: "text",
+        content: { text }
+      }
+    );
+
+    if (sendRes.error && sendRes.error !== "" && sendRes.error !== "error_none") {
+      console.error(`[ShopeeChat] Failed to send message to ${orderSn}: ${sendRes.message ?? sendRes.error}`);
+      return;
+    }
+
+    console.log(`[ShopeeChat] Sent thank-you message to buyer ${buyerUserId} for order ${orderSn}`);
+  } catch (err) {
+    console.error(`[ShopeeChat] Error sending message for ${orderSn}:`, err);
+  }
+}
+
 /**
  * Check whether an active Shopee order has been cancelled by the buyer. If it
  * has, delete it from our DB so it cannot be claimed. Returns true if the order
@@ -168,6 +227,9 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
     });
 
     console.log(`[ShopeeShip] Successfully shipped order ${orderSn}`);
+
+    // Send thank-you message to buyer via Shopee chat (fire-and-forget)
+    sendShopeeChatMessage(orderSn, THANK_YOU_MESSAGE).catch(() => {});
   } catch (err) {
     console.error(`[ShopeeShip] Error shipping ${orderSn}:`, err);
   } finally {

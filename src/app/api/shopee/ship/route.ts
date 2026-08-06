@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { shopeeGet, shopeePost } from "@/lib/shopee-api";
 import { prisma } from "@/lib/prisma";
+import { sendShopeeChatMessage } from "@/lib/shopee-ship";
+
+const THANK_YOU_MESSAGE = "Thank you! Please click order received and rate us 5 stars yaa \uD83D\uDC95";
 
 type ShopeeShipResponse = {
   error?: string;
@@ -104,6 +107,9 @@ export async function POST(request: Request) {
           where: { orderId: order.orderId },
           data: { status: "shipped", shippedOnShopee: true }
         });
+
+        // Send thank-you message to buyer via Shopee chat (fire-and-forget)
+        sendShopeeChatMessage(orderSn, THANK_YOU_MESSAGE).catch(() => {});
 
         results.push({ shopeeOrderId: orderSn, status: "shipped" });
       } catch (err) {
