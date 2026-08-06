@@ -842,9 +842,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Products</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Total Qty</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
-                <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 sm:table-cell">Source</th>
-                <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 sm:table-cell">Claims</th>
-                <th className="hidden px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 md:table-cell">Created</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Source</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Claims</th>
+                <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Created</th>
                 <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">Action</th>
               </tr>
             </thead>
@@ -941,7 +941,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         {order.status}
                       </span>
                     </td>
-                    <td className="hidden px-4 py-2 sm:table-cell">
+                    <td className="px-4 py-2">
                       <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
                         order.source === "shopee"
                           ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
@@ -952,7 +952,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         {order.source}
                       </span>
                     </td>
-                    <td className="hidden px-4 py-2 text-slate-500 sm:table-cell">
+                    <td className="px-4 py-2 text-slate-500">
                       {order._count.claims > 0 ? (
                         <button
                           onClick={() => setExpandedOrder(expandedOrder === order.orderId ? null : order.orderId)}
@@ -964,7 +964,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         <span className="text-slate-400">0</span>
                       )}
                     </td>
-                    <td className="hidden px-4 py-2 text-xs text-slate-500 md:table-cell">
+                    <td className="px-4 py-2 text-xs text-slate-500">
                       {new Date(order.createdAt).toLocaleString()}
                     </td>
                     <td className="px-4 py-2">
