@@ -71,6 +71,32 @@ async function partitionKnownOrders(
   return { newSns, duplicateSns };
 }
 
+// Fire-and-forget cancelled-order scan. Runs at most once per
+// CANCELLED_CHECK_INTERVAL_MS and is never awaited by the caller so a slow
+// Shopee response can never delay new-order ingestion.
+function scheduleCancelledCheck(timeFrom: number, timeTo: number, maxRangeSeconds: number): void {
+  const now = Date.now();
+  if (now - lastCancelledCheckAt < CANCELLED_CHECK_INTERVAL_MS) return;
+  lastCancelledCheckAt = now;
+
+  (async () => {
+    const cancelledSns: string[] = [];
+    let chunkStart = timeFrom;
+    while (chunkStart < timeTo) {
+      const chunkEnd = Math.min(chunkStart + maxRangeSeconds, timeTo);
+      const sns = await fetchOrderSnsForStatus(CANCELLED_STATUS, chunkStart, chunkEnd);
+      cancelledSns.push(...sns);
+      chunkStart = chunkEnd;
+    }
+    const result = await removeCancelledOrders(cancelledSns);
+    if (result.deleted > 0) {
+      console.log(`[ShopeeSync] Background cancelled-check deleted ${result.deleted} order(s)`);
+    }
+  })().catch((err) => {
+    console.error("[ShopeeSync] Background cancelled-check failed:", err);
+  });
+}
+
 // Delete active Shopee orders that were cancelled on Shopee before any claim was made.
 // Returns the number of deleted orders.
 async function removeCancelledOrders(orderSns: string[]): Promise<{ deleted: number; skipped: number }> {
@@ -274,31 +300,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Periodically check for cancelled orders in the same time window. Throttled
-    // since this is an extra full Shopee API fetch and claim/start already does
-    // a real-time check before any claim is allowed.
-    let cancelledRemoval = { deleted: 0, skipped: 0 };
-    const now = Date.now();
-    if (now - lastCancelledCheckAt >= CANCELLED_CHECK_INTERVAL_MS) {
-      lastCancelledCheckAt = now;
-      const cancelledSns: string[] = [];
-      let chunkStart = timeFrom;
-      while (chunkStart < timeTo) {
-        const chunkEnd = Math.min(chunkStart + MAX_RANGE_SECONDS, timeTo);
-        const sns = await fetchOrderSnsForStatus(CANCELLED_STATUS, chunkStart, chunkEnd);
-        cancelledSns.push(...sns);
-        chunkStart = chunkEnd;
-      }
-      cancelledRemoval = await removeCancelledOrders(cancelledSns);
-    }
+    // Kick off the cancelled-order backstop scan in the background. This never
+    // blocks the response — new-order ingestion below always completes first,
+    // regardless of how slow Shopee's CANCELLED status list is to return.
+    scheduleCancelledCheck(timeFrom, timeTo, MAX_RANGE_SECONDS);
 
     const uniqueSns = Array.from(new Set(allSns));
     if (uniqueSns.length === 0) {
       return NextResponse.json({
         message: "No new orders to sync",
         synced: 0,
-        statuses,
-        cancelled: cancelledRemoval
+        statuses
       });
     }
 
@@ -333,8 +345,6 @@ export async function POST(request: Request) {
       duplicates: results.filter((r) => r.status === "duplicate").length,
       skipped: results.filter((r) => r.status === "skipped").length,
       failed: results.filter((r) => r.status === "failed").length,
-      cancelledDeleted: cancelledRemoval.deleted,
-      cancelledSkipped: cancelledRemoval.skipped,
       statuses
     };
 
