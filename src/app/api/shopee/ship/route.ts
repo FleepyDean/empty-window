@@ -9,11 +9,14 @@ type ShopeeShipResponse = {
 
 type ShopeeLogisticsInfoResponse = {
   response?: {
-    logistics_info?: Array<{
-      logistics_id?: number;
-      logistics_channel_name?: string;
-      is_virtual_goods?: boolean;
-    }>;
+    info_needed?: {
+      pickup?: string[];
+      dropoff?: string[];
+      non_integrated?: string[];
+    };
+    pickup?: { branch_list?: unknown[] | null };
+    dropoff?: { branch_list?: unknown[] | null };
+    non_integrated?: unknown;
   };
   error?: string;
   message?: string;
@@ -57,8 +60,7 @@ export async function POST(request: Request) {
           { order_sn: orderSn }
         );
 
-        const logList = logisticsInfo.response?.logistics_info ?? [];
-        const isVirtual = logList.some((l) => l.is_virtual_goods === true);
+        const infoNeeded = logisticsInfo.response?.info_needed ?? {};
 
         console.log(`[ShopeeShip] ${orderSn} logistics response:`, JSON.stringify(logisticsInfo));
 
@@ -67,10 +69,14 @@ export async function POST(request: Request) {
           order_sn: orderSn
         };
 
-        // Virtual goods: no pickup/dropoff needed
-        if (!isVirtual && logList.length > 0) {
-          // For non-virtual: use first logistics option with dropoff
+        // Prefer non_integrated (virtual / self-arranged goods), then dropoff, then pickup.
+        // If a method requires a tracking number we don't have, skip it for the next option.
+        if (Array.isArray(infoNeeded.non_integrated)) {
+          shipBody.non_integrated = {};
+        } else if (Array.isArray(infoNeeded.dropoff) && !infoNeeded.dropoff.includes("tracking_number")) {
           shipBody.dropoff = {};
+        } else if (Array.isArray(infoNeeded.pickup)) {
+          shipBody.pickup = {};
         }
 
         console.log(`[ShopeeShip] ${orderSn} ship body:`, JSON.stringify(shipBody));
