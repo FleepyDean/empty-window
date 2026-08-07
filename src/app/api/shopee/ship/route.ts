@@ -121,12 +121,17 @@ export async function POST(request: Request) {
         console.log(`[ShopeeShip] ${orderSn} ship response:`, JSON.stringify(shipRes));
 
         if (shipRes.error && shipRes.error !== "" && shipRes.error !== "error_none") {
-          results.push({
-            shopeeOrderId: orderSn,
-            status: "failed",
-            reason: shipRes.message ?? shipRes.error
-          });
-          continue;
+          const errMsg = (shipRes.message ?? shipRes.error ?? "").toLowerCase();
+          if (errMsg.includes("already shipped") || errMsg.includes("order status is not valid") || errMsg.includes("ship_order")) {
+            console.log(`[ShopeeShip] ${orderSn} already shipped on Shopee; treating as success`);
+          } else {
+            results.push({
+              shopeeOrderId: orderSn,
+              status: "failed",
+              reason: shipRes.message ?? shipRes.error
+            });
+            continue;
+          }
         }
 
         // Mark as shipped in our DB

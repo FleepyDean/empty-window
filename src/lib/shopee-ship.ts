@@ -217,8 +217,15 @@ export async function shipShopeeOrderIfNeeded(orderId: string): Promise<void> {
     console.log(`[ShopeeShip] ${orderSn} ship response:`, JSON.stringify(shipRes));
 
     if (shipRes.error && shipRes.error !== "" && shipRes.error !== "error_none") {
-      console.error(`[ShopeeShip] Failed to ship ${orderSn}: ${shipRes.message ?? shipRes.error}`);
-      return;
+      // If the order was already shipped on Shopee (e.g. manually by the seller),
+      // treat it as success — mark shippedOnShopee and send the thank-you message.
+      const errMsg = (shipRes.message ?? shipRes.error ?? "").toLowerCase();
+      if (errMsg.includes("already shipped") || errMsg.includes("order status is not valid") || errMsg.includes("ship_order")) {
+        console.log(`[ShopeeShip] ${orderSn} already shipped on Shopee; treating as success`);
+      } else {
+        console.error(`[ShopeeShip] Failed to ship ${orderSn}: ${shipRes.message ?? shipRes.error}`);
+        return;
+      }
     }
 
     await prisma.order.update({
