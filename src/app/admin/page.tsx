@@ -521,11 +521,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       const res = await fetch("/api/admin/sync-status");
       const data = await res.json();
       if (res.ok) {
-        const hadPrevious = lastSyncAtRef.current !== null;
-        const newSync = hadPrevious && data.lastSyncAt && data.lastSyncAt !== lastSyncAtRef.current;
-        if (newSync) {
-          fetchOrders();
-        }
         lastSyncAtRef.current = data.lastSyncAt;
         setSyncStatus(data);
       }
