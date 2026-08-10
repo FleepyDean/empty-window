@@ -13,10 +13,19 @@ export async function POST(request: Request) {
     const price = typeof maxPrice === "number" ? maxPrice : undefined;
     const op = typeof operatorPriority === "string" && operatorPriority ? operatorPriority : undefined;
 
-    // Strict mode: only request from the specified operator, no fallback
+    // Strict mode: only request from the selected operators, no fallback to others
     if (strictOperator && op) {
-      const result = await getNumber(svc, price, op);
-      return NextResponse.json({ ...result, operator: op });
+      const ops = op.split(",").filter(Boolean);
+      let lastErr: Error | null = null;
+      for (const singleOp of ops) {
+        try {
+          const result = await getNumber(svc, price, singleOp);
+          return NextResponse.json({ ...result, operator: singleOp });
+        } catch (err) {
+          lastErr = err instanceof Error ? err : new Error(String(err));
+        }
+      }
+      throw lastErr ?? new Error("No numbers available from selected operators");
     }
 
     const result = await getNumberCheapest(svc, price, op);

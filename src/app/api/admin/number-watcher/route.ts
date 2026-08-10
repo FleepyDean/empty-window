@@ -33,9 +33,25 @@ export async function GET(request: Request) {
   } else {
     // The only reliable availability test: try to actually get a number.
     try {
-      const result = strictOperator && operatorPriority
-        ? await getNumber(service, maxPrice, operatorPriority).then(r => ({ ...r, operator: operatorPriority }))
-        : await getNumberCheapest(service, maxPrice, operatorPriority);
+      let result;
+      if (strictOperator && operatorPriority) {
+        const ops = operatorPriority.split(",").filter(Boolean);
+        let lastErr: Error | null = null;
+        let got: { activationId: string; phoneNumber: string; service: string; price: number | null; operator: string } | null = null;
+        for (const singleOp of ops) {
+          try {
+            const r = await getNumber(service, maxPrice, singleOp);
+            got = { ...r, operator: singleOp };
+            break;
+          } catch (err) {
+            lastErr = err instanceof Error ? err : new Error(String(err));
+          }
+        }
+        if (!got) throw lastErr ?? new Error("No numbers available from selected operators");
+        result = got;
+      } else {
+        result = await getNumberCheapest(service, maxPrice, operatorPriority);
+      }
       reservedNumber = { activationId: result.activationId, phoneNumber: result.phoneNumber, price: result.price ?? null, operator: result.operator };
       available = true;
       console.log(`[NumberWatcher] Reserved number: ${result.phoneNumber} (${result.activationId})`);
