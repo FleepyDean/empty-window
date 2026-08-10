@@ -98,7 +98,7 @@ export default function CbtlRegisterPage() {
   // Max price setting (persisted in localStorage)
   const [maxPrice, setMaxPrice] = useState<string>("0.0799");
   const [maxPriceInput, setMaxPriceInput] = useState<string>("0.0799");
-  const [operatorPriority, setOperatorPriority] = useState<string>("u_mobile");
+  const [operatorPriority, setOperatorPriority] = useState<string>("u_mobile"); // comma-separated list of operators
   const [strictOperator, setStrictOperator] = useState(false);
   const MAX_PRICE_KEY = "cbtl_max_price";
   const OPERATOR_PRIORITY_KEY = "cbtl_operator_priority";
@@ -553,7 +553,12 @@ export default function CbtlRegisterPage() {
     toast.success("Max price updated to $" + val);
   }
 
-  function saveOperatorPriority(value: string) {
+  function toggleOperator(op: string) {
+    const current = operatorPriority ? operatorPriority.split(",").filter(Boolean) : [];
+    const next = current.includes(op)
+      ? current.filter((o) => o !== op)
+      : [...current, op];
+    const value = next.join(",");
     setOperatorPriority(value);
     localStorage.setItem(OPERATOR_PRIORITY_KEY, value);
   }
@@ -699,35 +704,32 @@ export default function CbtlRegisterPage() {
           </button>
           <span className="text-xs text-slate-400">Current: ${maxPrice}</span>
           <span className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
-          <label htmlFor="operator-priority" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Operator Priority:
-          </label>
-          <select
-            id="operator-priority"
-            value={operatorPriority}
-            onChange={(e) => saveOperatorPriority(e.target.value)}
-            className="rounded border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          >
-            <option value="">Any operator</option>
-            <option value="hotlink">Hotlink</option>
-            <option value="tune_talk">Tune Talk</option>
-            <option value="xox">XOX</option>
-            <option value="celcom">Celcom</option>
-            <option value="yes">YES</option>
-            <option value="unifi">Unifi</option>
-            <option value="digi">DiGi</option>
-            <option value="u_mobile">U Mobile</option>
-            <option value="yoodo">Yoodo</option>
-          </select>
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={strictOperator}
-              onChange={(e) => saveStrictOperator(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-800"
-            />
-            <span className="text-xs text-slate-400">Strict</span>
-          </label>
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Operators:</span>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {(Object.keys(OPERATOR_LABELS) as (keyof typeof OPERATOR_LABELS)[]).map((op) => {
+              const selected = operatorPriority?.split(",").filter(Boolean).includes(op) ?? false;
+              return (
+                <label key={op} className="flex items-center gap-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => toggleOperator(op)}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-800"
+                  />
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{OPERATOR_LABELS[op]}</span>
+                </label>
+              );
+            })}
+            <label className="flex items-center gap-1.5 cursor-pointer select-none ml-1">
+              <input
+                type="checkbox"
+                checked={strictOperator}
+                onChange={(e) => saveStrictOperator(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-800"
+              />
+              <span className="text-xs font-semibold text-slate-400">Strict</span>
+            </label>
+          </div>
         </div>
 
         {/* Main work area */}
