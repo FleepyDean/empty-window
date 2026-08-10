@@ -720,14 +720,22 @@ export default function CbtlRegisterPage() {
                 </label>
               );
             })}
-            <label className="flex items-center gap-1.5 cursor-pointer select-none ml-1">
+            <span className="ml-1 h-3.5 w-px bg-slate-200 dark:bg-slate-700" />
+            <label
+              className={
+                "flex cursor-pointer select-none items-center gap-1 rounded border px-2 py-0.5 text-xs transition " +
+                (strictOperator
+                  ? "border-cyan-500 bg-cyan-500/10 font-semibold text-cyan-600 dark:border-cyan-400 dark:text-cyan-400"
+                  : "border-slate-300 font-medium text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800")
+              }
+            >
               <input
                 type="checkbox"
                 checked={strictOperator}
                 onChange={(e) => saveStrictOperator(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-800"
+                className="hidden"
               />
-              <span className="text-xs font-semibold text-slate-400">Strict</span>
+              <span>{strictOperator ? "✓ Strict" : "Strict"}</span>
             </label>
           </div>
         </div>
