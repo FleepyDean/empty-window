@@ -107,6 +107,8 @@ export default function CbtlRegisterPage() {
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
   const emailPollRef = useRef<NodeJS.Timeout | null>(null);
+  const emailPollParamsRef = useRef<{ email: string; since: Date } | null>(null);
+  const [emailOtpFetching, setEmailOtpFetching] = useState(false);
 
   // ── Fetch helpers ──────────────────────────────────────────────────────────
 
@@ -165,8 +167,13 @@ export default function CbtlRegisterPage() {
       if (raw) {
         const s: PersistedSession = JSON.parse(raw);
         if (s.activeEmailId) setActiveEmailId(s.activeEmailId);
-        if (s.emailOtp) { setEmailOtp(s.emailOtp); setEmailOtpStatus("success"); }
-        else if (s.emailOtpStatus === "polling" && s.emailPollingSince && s.activeEmailAddress) {
+        if (s.emailOtp) {
+          setEmailOtp(s.emailOtp);
+          setEmailOtpStatus("success");
+          if (s.emailPollingSince && s.activeEmailAddress) {
+            emailPollParamsRef.current = { email: s.activeEmailAddress, since: new Date(s.emailPollingSince) };
+          }
+        } else if (s.emailOtpStatus === "polling" && s.emailPollingSince && s.activeEmailAddress) {
           startEmailPolling(s.activeEmailAddress, new Date(s.emailPollingSince));
         }
         if (s.sms && s.sms.status === "waiting") {
@@ -226,6 +233,7 @@ export default function CbtlRegisterPage() {
   function startEmailPolling(email: string, sinceOverride?: Date) {
     stopEmailPolling();
     const since = sinceOverride ?? new Date();
+    emailPollParamsRef.current = { email, since };
     setEmailOtp(null);
     setEmailOtpStatus("polling");
     saveSession({ emailOtpStatus: "polling", emailPollingSince: since.toISOString(), activeEmailAddress: email, emailOtp: null });
@@ -250,6 +258,34 @@ export default function CbtlRegisterPage() {
     }, 4000);
 
     emailPollRef.current = poll;
+  }
+
+  async function fetchLatestEmailOtp() {
+    const params = emailPollParamsRef.current;
+    if (!params) return;
+    setEmailOtpFetching(true);
+    try {
+      const url = `/api/admin/cbtl-register/email-otp?email=${encodeURIComponent(params.email)}&since=${encodeURIComponent(params.since.toISOString())}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        toast.error("Failed to fetch email OTP.");
+        return;
+      }
+      const d = await res.json();
+      if (d.status === "success" && d.otp) {
+        stopEmailPolling();
+        setEmailOtp(d.otp);
+        setEmailOtpStatus("success");
+        saveSession({ emailOtp: d.otp, emailOtpStatus: "success" });
+        toast.success(`Email OTP received: ${d.otp}`);
+      } else {
+        toast.info("No email OTP found yet.");
+      }
+    } catch {
+      toast.error("Failed to fetch email OTP.");
+    } finally {
+      setEmailOtpFetching(false);
+    }
   }
 
   function startPolling(activationId: string) {
@@ -812,12 +848,21 @@ export default function CbtlRegisterPage() {
                   <span className="font-mono text-2xl font-bold tracking-widest text-violet-600 dark:text-violet-400">
                     {emailOtp}
                   </span>
-                  <button
-                    onClick={() => copy(emailOtp, "Email OTP")}
-                    className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
-                  >
-                    Copy
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchLatestEmailOtp}
+                      disabled={emailOtpFetching}
+                      className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 disabled:opacity-60 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
+                    >
+                      {emailOtpFetching ? "Fetching..." : "Fetch Latest"}
+                    </button>
+                    <button
+                      onClick={() => copy(emailOtp, "Email OTP")}
+                      className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:border-cyan-500 hover:text-cyan-600 dark:border-slate-700 dark:hover:border-cyan-400 dark:hover:text-cyan-400"
+                    >
+                      Copy
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <p className="mb-3 text-xs text-slate-400">
