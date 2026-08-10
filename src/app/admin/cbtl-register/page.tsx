@@ -99,8 +99,10 @@ export default function CbtlRegisterPage() {
   const [maxPrice, setMaxPrice] = useState<string>("0.0799");
   const [maxPriceInput, setMaxPriceInput] = useState<string>("0.0799");
   const [operatorPriority, setOperatorPriority] = useState<string>("u_mobile");
+  const [strictOperator, setStrictOperator] = useState(false);
   const MAX_PRICE_KEY = "cbtl_max_price";
   const OPERATOR_PRIORITY_KEY = "cbtl_operator_priority";
+  const STRICT_OPERATOR_KEY = "cbtl_strict_operator";
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedRef = useRef<NodeJS.Timeout | null>(null);
@@ -154,6 +156,8 @@ export default function CbtlRegisterPage() {
     }
     const savedOperator = localStorage.getItem(OPERATOR_PRIORITY_KEY);
     if (savedOperator !== null) setOperatorPriority(savedOperator);
+    const savedStrict = localStorage.getItem(STRICT_OPERATOR_KEY);
+    if (savedStrict !== null) setStrictOperator(savedStrict === "true");
 
     // Restore persisted session
     try {
@@ -318,7 +322,8 @@ export default function CbtlRegisterPage() {
         body: JSON.stringify({
           service: SERVICE,
           maxPrice: parseFloat(maxPrice),
-          operatorPriority: operatorPriority || undefined
+          operatorPriority: operatorPriority || undefined,
+          strictOperator: strictOperator && !!operatorPriority
         })
       });
       const d = await res.json();
@@ -449,6 +454,7 @@ export default function CbtlRegisterPage() {
     try {
       const params = new URLSearchParams({ maxPrice });
       if (operatorPriority) params.set("operatorPriority", operatorPriority);
+      if (strictOperator && operatorPriority) params.set("strictOperator", "true");
       const res = await fetch("/api/admin/number-watcher?" + params.toString());
       if (!res.ok) return;
       const d = await res.json();
@@ -550,6 +556,11 @@ export default function CbtlRegisterPage() {
   function saveOperatorPriority(value: string) {
     setOperatorPriority(value);
     localStorage.setItem(OPERATOR_PRIORITY_KEY, value);
+  }
+
+  function saveStrictOperator(value: boolean) {
+    setStrictOperator(value);
+    localStorage.setItem(STRICT_OPERATOR_KEY, String(value));
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -708,6 +719,15 @@ export default function CbtlRegisterPage() {
             <option value="u_mobile">U Mobile</option>
             <option value="yoodo">Yoodo</option>
           </select>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={strictOperator}
+              onChange={(e) => saveStrictOperator(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500 dark:border-slate-600 dark:bg-slate-800"
+            />
+            <span className="text-xs text-slate-400">Strict</span>
+          </label>
         </div>
 
         {/* Main work area */}

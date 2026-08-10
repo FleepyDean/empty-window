@@ -1,5 +1,5 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { getNumberCheapest } from "@/lib/herosms";
+import { getNumber, getNumberCheapest } from "@/lib/herosms";
 import { sendTelegramMessage, isTelegramConfigured } from "@/lib/telegram";
 import { NextResponse } from "next/server";
 
@@ -21,6 +21,7 @@ export async function GET(request: Request) {
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? parseFloat(maxPriceParam) : undefined;
   const operatorPriority = searchParams.get("operatorPriority") || undefined;
+  const strictOperator = searchParams.get("strictOperator") === "true";
   const service = "ot";
 
   let available = false;
@@ -32,7 +33,9 @@ export async function GET(request: Request) {
   } else {
     // The only reliable availability test: try to actually get a number.
     try {
-      const result = await getNumberCheapest(service, maxPrice, operatorPriority);
+      const result = strictOperator && operatorPriority
+        ? await getNumber(service, maxPrice, operatorPriority).then(r => ({ ...r, operator: operatorPriority }))
+        : await getNumberCheapest(service, maxPrice, operatorPriority);
       reservedNumber = { activationId: result.activationId, phoneNumber: result.phoneNumber, price: result.price ?? null, operator: result.operator };
       available = true;
       console.log(`[NumberWatcher] Reserved number: ${result.phoneNumber} (${result.activationId})`);

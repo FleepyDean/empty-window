@@ -1,19 +1,25 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { cancelNumber, getBalance, getNumberCheapest, getOtp, resendOtp } from "@/lib/herosms";
+import { cancelNumber, getBalance, getNumber, getNumberCheapest, getOtp, resendOtp } from "@/lib/herosms";
 import { NextResponse } from "next/server";
 
 // POST /api/admin/cbtl-register/sms  — request a new phone number
 export async function POST(request: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const { service, maxPrice, operatorPriority } = await request.json().catch(() => ({}));
+  const { service, maxPrice, operatorPriority, strictOperator } = await request.json().catch(() => ({}));
 
   try {
-    const result = await getNumberCheapest(
-      service ?? "ot",
-      typeof maxPrice === "number" ? maxPrice : undefined,
-      typeof operatorPriority === "string" && operatorPriority ? operatorPriority : undefined
-    );
+    const svc = service ?? "ot";
+    const price = typeof maxPrice === "number" ? maxPrice : undefined;
+    const op = typeof operatorPriority === "string" && operatorPriority ? operatorPriority : undefined;
+
+    // Strict mode: only request from the specified operator, no fallback
+    if (strictOperator && op) {
+      const result = await getNumber(svc, price, op);
+      return NextResponse.json({ ...result, operator: op });
+    }
+
+    const result = await getNumberCheapest(svc, price, op);
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(
