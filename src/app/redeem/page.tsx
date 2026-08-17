@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/theme";
 import { PRODUCT_MAP, ProductConfig, isProductKey } from "@/lib/products";
@@ -121,6 +121,7 @@ function RedeemPageContent() {
   const [revealedLinks, setRevealedLinks] = useState<Set<string>>(new Set());
   const [waitingForPhone, setWaitingForPhone] = useState(false);
   const [claimCreatedAt, setClaimCreatedAt] = useState<number | null>(null);
+  const restoredForOrderId = useRef<string | null>(null);
   const CLAIM_SETTLE_MS = 5000;
 
   const CANCEL_COOLDOWN_MS = 2 * 60 * 1000;
@@ -582,10 +583,21 @@ function RedeemPageContent() {
     return () => clearInterval(poll);
   }, [claimState, activeClaim]);
 
-  // Restore active claim on page load
+  // Restore active claim only for the currently loaded order
   useEffect(() => {
+    if (!orderDetails) return;
+    if (restoredForOrderId.current === orderDetails.orderId) return;
+    restoredForOrderId.current = orderDetails.orderId;
+
     const savedClaimId = localStorage.getItem(ACTIVE_CLAIM_ID_KEY);
     if (!savedClaimId) return;
+
+    // Only restore if the saved claim actually belongs to this order
+    if (!orderDetails.claims.some((c) => c.claimId === savedClaimId)) {
+      clearActiveClaimId();
+      setActiveClaim(null);
+      return;
+    }
 
     const restoreSession = async () => {
       try {
@@ -662,14 +674,36 @@ function RedeemPageContent() {
     };
 
     void restoreSession();
-  }, []);
+  }, [orderDetails]);
 
   // Auto-revalidate from URL only (no localStorage cache)
+  // Always reset/redraw when the URL orderId changes so a previous order is never left on screen
   useEffect(() => {
-    if (orderDetails) return;
     const targetId = urlOrderId || "";
-    if (!targetId) return;
+    if (!targetId) {
+      setOrderDetails(null);
+      setActiveClaim(null);
+      setClaimState("idle");
+      setOtp(null);
+      setEmailOtp(null);
+      setClaimingProduct(null);
+      setActiveTab("products");
+      setRevealedLinks(new Set());
+      return;
+    }
+    // Already loaded the order matching the URL — skip
+    if (orderDetails?.orderId === targetId) return;
+
+    restoredForOrderId.current = null;
     setOrderIdInput(targetId);
+    setOrderDetails(null); // clear old order while loading the new one
+    setActiveClaim(null);
+    setClaimState("idle");
+    setOtp(null);
+    setEmailOtp(null);
+    setClaimingProduct(null);
+    setActiveTab("products");
+    setRevealedLinks(new Set());
     (async () => {
       try {
         const response = await fetch("/api/orders/details", {
@@ -682,13 +716,6 @@ function RedeemPageContent() {
           setOrderDetails(data);
           if (urlOrderId !== targetId) {
             router.replace(`${pathname}?orderId=${encodeURIComponent(targetId)}`);
-          }
-          // Clear stale claim if it doesn't belong to this order
-          const savedClaimId = localStorage.getItem(ACTIVE_CLAIM_ID_KEY);
-          if (savedClaimId && !data.claims.some((c) => c.claimId === savedClaimId)) {
-            clearActiveClaimId();
-            setActiveClaim(null);
-            setClaimState("idle");
           }
         }
       } catch {
