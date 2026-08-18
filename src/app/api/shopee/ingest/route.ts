@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { matchProductByKeyword } from "@/lib/product-matcher";
+import { sendCbtlRedemptionMessage } from "@/lib/shopee-api";
 
 // Optional shared secret to prevent random POSTs (set in .env)
 const INGEST_SECRET = process.env.SHOPEE_INGEST_SECRET || "";
@@ -163,6 +164,13 @@ export async function POST(request: Request) {
         status: "created",
         orderId: created.orderId,
       });
+
+      // Auto-send redemption instructions for CBTL orders
+      if (finalItems.some((item) => item.productKey === "cbtl")) {
+        sendCbtlRedemptionMessage(sid).catch((err: unknown) => {
+          console.error(`[ShopeeIngest] Failed to send CBTL message for ${sid}:`, err instanceof Error ? err.message : err);
+        });
+      }
     } catch (error) {
       results.push({
         shopeeOrderId: sid,

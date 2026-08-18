@@ -103,6 +103,37 @@ export async function sendShopeeBuyerMessage(toId: number, message: string, orde
   }
 }
 
+function buildCbtlRedemptionMessage(orderId: string): string {
+  const redeemUrl = `https://nishinae.store/redeem?orderId=${encodeURIComponent(orderId)}`;
+  return `CBTL – [This shop is SELF REDEEM]\n\nVisit ${redeemUrl} to redeem\n\nOpen your MyCBTL app and make sure you're logged out\n\nLogin with the email given from the redemption page (LOGIN – DO NOT REGISTER)\n\nWait for the OTP from our website and enter it in the app`;
+}
+
+export async function fetchShopeeOrderBuyer(orderSn: string): Promise<number | undefined> {
+  try {
+    const data = await shopeeGet<{
+      response?: {
+        order_list?: Array<{ order_sn: string; buyer_user_id?: number }>;
+      };
+    }>("/api/v2/order/get_order_detail", {
+      order_sn_list: orderSn,
+      response_optional_fields: "buyer_user_id"
+    });
+    return data.response?.order_list?.[0]?.buyer_user_id;
+  } catch (err) {
+    console.error(`[ShopeeChat] Failed to fetch buyer for ${orderSn}:`, err instanceof Error ? err.message : err);
+    return undefined;
+  }
+}
+
+export async function sendCbtlRedemptionMessage(orderId: string, buyerUserId?: number): Promise<boolean> {
+  const toId = buyerUserId ?? (await fetchShopeeOrderBuyer(orderId));
+  if (!toId) {
+    console.log(`[ShopeeChat] No buyer_user_id for ${orderId}; skipping CBTL message`);
+    return false;
+  }
+  return sendShopeeBuyerMessage(toId, buildCbtlRedemptionMessage(orderId), orderId);
+}
+
 // Backwards-compatible exports for token/signature helpers
 export { getShopeeEnv as getShopeeConfig, getValidAccessToken, generateSignature, saveTokens } from "@/lib/shopee-token";
 

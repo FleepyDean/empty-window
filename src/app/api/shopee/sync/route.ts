@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { shopeeGet, sendShopeeBuyerMessage } from "@/lib/shopee-api";
+import { shopeeGet, sendCbtlRedemptionMessage } from "@/lib/shopee-api";
 import { prisma } from "@/lib/prisma";
 import { matchProductByKeyword } from "@/lib/product-matcher";
 
@@ -210,10 +210,8 @@ async function ingestOrder(order: ShopeeOrderItem) {
   });
 
   // Auto-send redemption instructions for CBTL orders
-  if (primary.productKey === "cbtl" && order.buyer_user_id) {
-    const redeemUrl = `https://nishinae.store/redeem?orderId=${encodeURIComponent(sid)}`;
-    const message = `CBTL – [This shop is SELF REDEEM]\n\nVisit ${redeemUrl} to redeem\n\nOpen your MyCBTL app and make sure you're logged out\n\nLogin with the email given from the redemption page (LOGIN – DO NOT REGISTER)\n\nWait for the OTP from our website and enter it in the app`;
-    sendShopeeBuyerMessage(order.buyer_user_id, message, sid).catch((err) => {
+  if (finalItems.some((item) => item.productKey === "cbtl") && order.buyer_user_id) {
+    sendCbtlRedemptionMessage(sid, order.buyer_user_id).catch((err: unknown) => {
       console.error(`[ShopeeSync] Failed to send CBTL message for ${sid}:`, err instanceof Error ? err.message : err);
     });
   }
