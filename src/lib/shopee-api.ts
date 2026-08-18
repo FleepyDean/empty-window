@@ -86,6 +86,23 @@ export async function shopeePost<T>(
   return res.json() as Promise<T>;
 }
 
+export async function sendShopeeBuyerMessage(toId: number, message: string, orderSn?: string): Promise<boolean> {
+  try {
+    const content: Record<string, unknown> = { text: message };
+    if (orderSn) content.order_sn = orderSn;
+    await shopeePost("/api/v2/sellerchat/send_message", {
+      to_id: toId,
+      message_type: "text",
+      content
+    });
+    console.log(`[ShopeeChat] Sent message to buyer ${toId}`);
+    return true;
+  } catch (err) {
+    console.error("[ShopeeChat] send_message failed:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 // Backwards-compatible exports for token/signature helpers
 export { getShopeeEnv as getShopeeConfig, getValidAccessToken, generateSignature, saveTokens } from "@/lib/shopee-token";
 
